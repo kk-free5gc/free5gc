@@ -18,23 +18,49 @@ configuration:
   nrfUri: http://127.0.0.10:8000 # a valid URI of NRF
   nrfCertPem: cert/nrf.pem # NRF Certificate
   supportedPlmnList: # the PLMNs (Public land mobile network) list supported by this NSSF
-    - mcc: 208 # Mobile Country Code (3 digits string, digit: 0~9)
-      mnc: 93 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+    - mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
+      mnc: 11 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+    - mcc: 001 # Mobile Country Code (3 digits string, digit: 0~9)
+      mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+    - mcc: 311 # Mobile Country Code (3 digits string, digit: 0~9)
+      mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
   supportedNssaiInPlmnList: # Supported S-NSSAI List for each PLMN
     - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
-        mcc: 208 # Mobile Country Code (3 digits string, digit: 0~9)
-        mnc: 93 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+        mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 11 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       supportedSnssaiList: # Supported S-NSSAIs of the PLMN
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-          sd: 010203 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
-        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-          sd: 112233 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
-        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-          sd: 000003 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
-        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
-          sd: 000002 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+          sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+    - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+        mcc: 001 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+      supportedSnssaiList: # Supported S-NSSAIs of the PLMN
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+    - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+        mcc: 311 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+      supportedSnssaiList: # Supported S-NSSAIs of the PLMN
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
   nsiList: # List of available Network Slice Instance (NSI)
     - snssai: # S-NSSAI of this NSI
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
@@ -51,20 +77,11 @@ configuration:
           nsiId: 11
     - snssai: # S-NSSAI of this NSI
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 000002 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
       nsiInformationList: # Information list of this NSI
         # the NRF to be used to select the NFs/services within the selected NSI, and an optonal ID
         - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
           nsiId: 12
-        - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
-          nsiId: 12
-    - snssai: # S-NSSAI of this NSI
-        sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 000003 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
-      nsiInformationList: # Information list of this NSI
-        # the NRF to be used to select the NFs/services within the selected NSI, and an optonal ID
-        - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
-          nsiId: 13
     - snssai: # S-NSSAI of this NSI
         sst: 2 # Slice/Service Type (uinteger, range: 0~255)
       nsiInformationList: # Information list of this NSI
@@ -73,25 +90,24 @@ configuration:
           nsiId: 20
     - snssai: # S-NSSAI of this NSI
         sst: 2 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
-      nsiInformationList: # Information list of this NSI
-        # the NRF to be used to select the NFs/services within the selected NSI, and an optonal ID
-        - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
-          nsiId: 21
-    - snssai: # S-NSSAI of this NSI
-        sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 010203 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
       nsiInformationList: # Information list of this NSI
         # the NRF to be used to select the NFs/services within the selected NSI, and an optonal ID
         - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
           nsiId: 22
     - snssai: # S-NSSAI of this NSI
-        sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 112233 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        sst: 3 # Slice/Service Type (uinteger, range: 0~255)
       nsiInformationList: # Information list of this NSI
         # the NRF to be used to select the NFs/services within the selected NSI, and an optonal ID
         - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
-          nsiId: 23
+          nsiId: 30
+    - snssai: # S-NSSAI of this NSI
+        sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+        sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+      nsiInformationList: # Information list of this NSI
+        # the NRF to be used to select the NFs/services within the selected NSI, and an optonal ID
+        - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
+          nsiId: 32
   amfSetList: # List of AMF Sets that my be assigned by this NSSF
     - amfSetId: 1 # the AMF Set identifier
       amfList: # Instance ID of the AMFs in this set
@@ -102,6 +118,48 @@ configuration:
       nrfAmfSet: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
       # the Nssai availability data information per TA supported by the AMF
       supportedNssaiAvailabilityData:
+        - tai: # Tracking Area Identifier
+            plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+              mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
+              mnc: 11 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+            tac: 00001 # Tracking Area Code (uinteger, range: 0~16777215)
+          supportedSnssaiList: # Supported S-NSSAIs of the tracking area
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - tai: # Tracking Area Identifier
+            plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+              mcc: 001 # Mobile Country Code (3 digits string, digit: 0~9)
+              mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+            tac: 00001 # Tracking Area Code (uinteger, range: 0~16777215)
+          supportedSnssaiList: # Supported S-NSSAIs of the tracking area
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - tai: # Tracking Area Identifier
+            plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+              mcc: 311 # Mobile Country Code (3 digits string, digit: 0~9)
+              mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+            tac: 00001 # Tracking Area Code (uinteger, range: 0~16777215)
+          supportedSnssaiList: # Supported S-NSSAIs of the tracking area
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - tai: # Tracking Area Identifier
             plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
               mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
@@ -235,6 +293,60 @@ configuration:
     - tai: # Tracking Area Identity
         plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
           mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
+          mnc: 11 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+        tac: 00001 # Tracking Area Code (uinteger, range: 0~16777215)
+      accessType: 3GPP_ACCESS # Access type of the tracking area
+      supportedSnssaiList: # List of supported S-NSSAIs of the tracking area
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)   
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)        
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)     
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)  
+    - tai: # Tracking Area Identity
+        plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+          mcc: 001 # Mobile Country Code (3 digits string, digit: 0~9)
+          mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+        tac: 00001 # Tracking Area Code (uinteger, range: 0~16777215)
+      accessType: 3GPP_ACCESS # Access type of the tracking area
+      supportedSnssaiList: # List of supported S-NSSAIs of the tracking area
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)   
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)        
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)     
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)  
+    - tai: # Tracking Area Identity
+        plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+          mcc: 311 # Mobile Country Code (3 digits string, digit: 0~9)
+          mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+        tac: 00001 # Tracking Area Code (uinteger, range: 0~16777215)
+      accessType: 3GPP_ACCESS # Access type of the tracking area
+      supportedSnssaiList: # List of supported S-NSSAIs of the tracking area
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)   
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)        
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)     
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)  
+    - tai: # Tracking Area Identity
+        plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+          mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
           mnc: 92 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
         tac: 33456 # Tracking Area Code (uinteger, range: 0~16777215)
       accessType: 3GPP_ACCESS # Access type of the tracking area
@@ -346,8 +458,59 @@ configuration:
           homeSnssai: # S-NSSAI in the home network
             sst: 1 # Slice/Service Type (uinteger, range: 0~255)
             sd: 000003 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+    - operatorName: CHTTL # Home PLMN name
+      homePlmnId: # Home PLMN identifier
+        mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 11 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+      mappingOfSnssai:
+        - servingSnssai: # S-NSSAI in the serving network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+          homeSnssai: # S-NSSAI in the home network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000002 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - servingSnssai: # S-NSSAI in the serving network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000002 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+          homeSnssai: # S-NSSAI in the home network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000003 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+    - operatorName: Amarisoft # Home PLMN name
+      homePlmnId: # Home PLMN identifier
+        mcc: 001 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+      mappingOfSnssai:
+        - servingSnssai: # S-NSSAI in the serving network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+          homeSnssai: # S-NSSAI in the home network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000002 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - servingSnssai: # S-NSSAI in the serving network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000002 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+          homeSnssai: # S-NSSAI in the home network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000003 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+    - operatorName: Verizon # Home PLMN name
+      homePlmnId: # Home PLMN identifier
+        mcc: 311 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+      mappingOfSnssai:
+        - servingSnssai: # S-NSSAI in the serving network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+          homeSnssai: # S-NSSAI in the home network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000002 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - servingSnssai: # S-NSSAI in the serving network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000002 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+          homeSnssai: # S-NSSAI in the home network
+            sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+            sd: 000003 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
 
 logger: # log output setting
   enable: true # true or false
-  level: info # how detailed to output, value: trace, debug, info, warn, error, fatal, panic
+  level: trace # how detailed to output, value: trace, debug, info, warn, error, fatal, panic
   reportCaller: false # enable the caller report or not, value: true or false

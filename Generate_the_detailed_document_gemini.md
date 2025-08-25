@@ -1,0 +1,1 @@
+/home/wnc/Documents/notes/ai_tool_prd_plan/Generate_the_detailed_document_gemini.md

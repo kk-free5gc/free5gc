@@ -1,0 +1,111 @@
+Feature Implementation Plan: UE Configuration Update for Transparent UE Policy Delivery
+1. Objective
+To implement the 3GPP procedure for updating UE policy information in the UE's configuration, initiated by the Policy Control Function (PCF) and delivered transparently via the Access and Mobility Management Function (AMF).
+
+2. Involved Network Functions (Actors)
+PCF (Policy Control Function): The primary actor that initiates and manages the policy update.
+
+AMF (Access and Mobility Management Function): Acts as a transparent proxy to deliver the policy from the PCF to the UE.
+
+UE (User Equipment): The recipient of the policy update.
+
+UDR (Unified Data Repository): Stores the latest policy information (PSIs) delivered to the UE.
+
+3. High-Level Implementation Prompts
+Prompt 1: Implement the PCF Policy Update Trigger Logic (Step 0)
+Task: Develop the logic within the PCF to decide when to initiate a UE policy update.
+
+Sub-Task 3.1.1: Implement Trigger Conditions:
+
+Create handlers for the following events:
+
+Initial UE Registration.
+
+UE mobility from EPS (4G) to 5GS (5G).
+
+Network-triggered events (e.g., change in UE location, change of Subscribed S-NSSAIs).
+
+Sub-Task 3.1.2: Implement Policy Information Set (PSI) Comparison:
+
+On a trigger, fetch the list of PSIs from the Npcf_UEPolicyControl_Create request.
+
+Compare this list with the existing policy to determine if an update is necessary.
+
+Sub-Task 3.1.3: Implement Policy Data Sizing and Fragmentation:
+
+Check if the generated UE policy information exceeds a predefined size limit (related to the NG-RAN PDCP layer limit).
+
+If the size exceeds the limit, implement logic to split the policy information into smaller, logically independent chunks.
+
+Sub-Task 3.1.4 (Optional): Implement Subscription for UE Response (Step 0a):
+
+If the PCF is not already subscribed, implement a mechanism to subscribe to the AMF to be notified of the UE's response to the policy update.
+
+Prompt 2: Implement the PCF-to-AMF Policy Delivery (Step 1)
+Task: Implement the communication from the PCF to the AMF to send the policy container.
+
+Sub-Task 3.2.1: Implement the Namf_Communication_N1N2MessageTransfer Service Client:
+
+Create a client in the PCF to invoke the Namf_Communication_N1N2MessageTransfer service on the AMF.
+
+The service call must include the SUPI and the UE Policy Container.
+
+Prompt 3: Implement the AMF's Transparent Forwarding Logic (Steps 2 & 3)
+Task: Develop the logic within the AMF to receive the policy from the PCF and forward it to the UE.
+
+Sub-Task 3.3.1: Implement the Namf_Communication_N1N2MessageTransfer Service Handler:
+
+Create a handler in the AMF to process the incoming request from the PCF.
+
+Sub-Task 3.3.2: Implement UE Reachability and State Check:
+
+Check if the UE is registered and reachable over 3GPP or non-3GPP access.
+
+If the UE is in CM-CONNECTED state, forward the UE Policy Container directly.
+
+If the UE is in CM-IDLE state, initiate the Network Triggered Service Request procedure (Paging) before sending the container.
+
+Sub-Task 3.3.3: Implement Delivery Failure Notification:
+
+If the UE is not reachable, implement the logic to report a failure back to the PCF using Namf_Communication_N1N2TransferFailureNotification.
+
+Prompt 4: Implement UE-Side Policy Handling and Response (Step 4)
+Task: Implement the logic on the UE to process the policy update.
+
+Sub-Task 3.4.1: Implement Policy Container Reception:
+
+Develop the capability for the UE to receive and parse the UE Policy Container from the AMF.
+
+Sub-Task 3.4.2: Implement Policy Update:
+
+Update the UE's local policy configuration based on the received information.
+
+Sub-Task 3.4.3: Implement Response Transmission:
+
+Send a response message back to the AMF indicating the result (success or failure) of the policy update.
+
+Prompt 5: Implement AMF-to-PCF Response Forwarding and Finalization (Step 5)
+Task: Implement the final leg of the procedure, where the AMF forwards the UE's response back to the PCF.
+
+Sub-Task 3.5.1: Implement Response Forwarding in AMF:
+
+Upon receiving the response from the UE, the AMF must forward it to the PCF using the Namf_Communication_N1MessageNotify service operation.
+
+Sub-Task 3.5.2: Implement Finalization Logic in PCF:
+
+Create a handler in the PCF for the Namf_Communication_N1MessageNotify message.
+
+On successful delivery, update the UDR with the new list of PSIs using the Nudr_DM_Update service operation.
+
+On failed delivery, initiate the UE Policy Association Modification procedure to subscribe to "Connectivity state changes" to re-trigger the update when the UE becomes connected.
+
+4. Summary of API/Service Interactions
+PCF -> AMF: Namf_Communication_N1N2MessageTransfer (Request)
+
+AMF -> PCF: Namf_Communication_N1N2TransferFailureNotification (Failure)
+
+AMF -> PCF: Namf_Communication_N1MessageNotify (Success/Response)
+
+PCF -> UDR: Nudr_DM_Update (Update Policy Set)
+
+PCF -> AMF: (Subscription for UE response notification)

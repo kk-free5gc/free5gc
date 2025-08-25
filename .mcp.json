@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "serena": {
+      "command": "uv",
+      "args": [
+        "run", 
+        "--directory", 
+        "/home/wnc/Downloads/source_code/serena", 
+        "serena-mcp-server",
+        "--context",
+        "ide-assistant",
+        "--project",
+        "/home/wnc/Downloads/source_code/free5gc_4.0.1/free5gc",
+        "--mode",
+        "interactive",
+        "--mode", 
+        "editing"
+      ],
+      "env": {
+        "GO111MODULE": "on"
+      }
+    }
+  }
+}

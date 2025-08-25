@@ -1,0 +1,82 @@
+Non-Access-Stratum 5GS (NAS)PDU
+    Security protected NAS 5GS message
+        Extended protocol discriminator: 5G mobility management messages (126)
+        0000 .... = Spare Half Octet: 0
+        .... 0010 = Security header type: Integrity protected and ciphered (2)
+        Message authentication code: 0xc4e5ffde
+        Sequence number: 4
+    Plain NAS 5GS Message
+        Extended protocol discriminator: 5G mobility management messages (126)
+        0000 .... = Spare Half Octet: 0
+        .... 0000 = Security header type: Plain NAS message, not security protected (0)
+        Message type: DL NAS transport (0x68)
+        0000 .... = Spare Half Octet: 0
+        Payload container type
+            .... 0101 = Payload container type: UE policy container (5)
+        Payload container
+            Length: 83
+            Procedure transaction identity: 1
+            Message type: MANAGE UE POLICY COMMAND (0x01)
+            UE policy section management list
+                Length: 79
+                UE policy section management sublist (PLMN 1)
+                    Length: 77
+                    Mobile Country Code (MCC): France (208)
+                    Mobile Network Code (MNC): Orange (32)
+                    Instruction 1
+                        Length: 72
+                        UPSC: 3
+                        UE policy part 1
+                            Length: 68
+                            .... 0001 = UE policy part type: URSP (1)
+                            URSP rule 1
+                                Length: 31
+                                Precedence: 1
+                                Length: 11
+                                Traffic descriptor
+                                    Traffic descriptor: DNN type (136)
+                                    Length: 9
+                                    DNN: business
+                                Length: 15
+                                Route selection descriptor list: 000dff000a020401e2e11108011001
+                                Route selection descriptor 1
+                                    Length: 13
+                                    Precedence: 255
+                                    Length: 10
+                                    Route selection descriptor contents
+                                        Route selection descriptor component type identifier: S-NSSAI (2)
+                                        Length of Mapped S-NSSAI content: 4
+                                        Slice/service type (SST): eMBB (1)
+                                        Slice differentiator (SD): 14868753
+                                        Route selection descriptor component type identifier: PDU session type (8)
+                                        .... .001 = PDU session type: IPv4 (1)
+                                        Route selection descriptor component type identifier: Preferred access type (16)
+                                        .... 0... = Spare: 0
+                                        .... .0.. = Spare: 0
+                                        .... ..01 = Access type: 3GPP access (1)
+                            URSP rule 2
+                                Length: 32
+                                Precedence: 2
+                                Length: 1
+                                Traffic descriptor
+                                    Traffic descriptor: Match-all type (1)
+                                Length: 26
+                                Route selection descriptor list: 0018ff0015020401def222040908696e7465726e657408011001
+                                Route selection descriptor 1
+                                    Length: 24
+                                    Precedence: 255
+                                    Length: 21
+                                    Route selection descriptor contents
+                                        Route selection descriptor component type identifier: S-NSSAI (2)
+                                        Length of Mapped S-NSSAI content: 4
+                                        Slice/service type (SST): eMBB (1)
+                                        Slice differentiator (SD): 14610978
+                                        Route selection descriptor component type identifier: DNN (4)
+                                        Length: 9
+                                        DNN: internet
+                                        Route selection descriptor component type identifier: PDU session type (8)
+                                        .... .001 = PDU session type: IPv4 (1)
+                                        Route selection descriptor component type identifier: Preferred access type (16)
+                                        .... 0... = Spare: 0
+                                        .... .0.. = Spare: 0
+                                        .... ..01 = Access type: 3GPP access (1)

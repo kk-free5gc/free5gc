@@ -1,0 +1,8 @@
+#[core]
+#max_output_tokens = 8192
+
+#[reasoning]
+#effort = "high"
+
+model_reasoning_effort = "high"
+model_reasoning_summary = "detailed"

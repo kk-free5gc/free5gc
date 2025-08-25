@@ -1,0 +1,81 @@
+Protocol discriminator = 0x7e (5GS Mobility Management)
+
+Security header = 0x2 (Integrity protected and ciphered)
+
+Auth code = 0xaedd094a
+
+Sequence number = 0x09
+
+Protocol discriminator = 0x7e (5GS Mobility Management)
+
+Security header = 0x0 (Plain 5GS NAS message, not security protected)
+
+Message type = 0x68 (DL NAS transport)
+
+Payload container type = 5 (UE policy container)
+
+Payload container:
+
+  Procedure transaction identity = 128
+
+  Message type = 0x01 (Manage UE policy command)
+
+    UE policy section management list:
+
+    Length: 64
+
+      UE policy section management sublist (PLMN 1):
+
+        MCC = 001
+
+        MNC = 01
+
+          Instruction 1:
+
+            UPSC: 0
+
+            UE policy part 1
+
+              UE policy part contents length: 53
+
+              UE policy part type: 1 (URSP)
+
+              UE policy part contents:
+
+              URSP rule 1
+
+                Length of URSP rule: 50
+
+                Precedence value of URSP rule: 255
+
+                Length of traffic descriptor: 21
+
+                Traffic descriptor:
+
+                  Match-all
+
+                Length of route selection descriptor list: 24
+
+                Route selection descriptor list:
+
+                  Route selection descriptor 1
+
+                    Length of route selection descriptor: 22
+
+                    Precedence value of route selection descriptor: 255
+
+                    Length of route selection descriptor contents: 19
+
+                    Route selection descriptor components:
+
+                      S-NSSAI
+
+                        Length of S-NSSAI contents = 4 (SST and SD)
+
+                        SST = 0x01
+
+                        SD = 0x000001
+
+                      DNN = "internet"
+
+                      Preferred access type = 1 (3GPP access)
