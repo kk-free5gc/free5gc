@@ -38,7 +38,11 @@ Detailed changes for each release are documented in the release notes. Detailed 
 
 free5GC is now under [Apache 2.0](https://github.com/free5gc/free5gc/blob/master/LICENSE.txt) license.
 
-# Branches
+## After clone:
+git submodule update --init --recursive --checkout
+./scripts/install-guards.sh
+
+## Branches
 
 - `baseline-v4.0.1` — Frozen snapshot at upstream tag **v4.0.1** (clean anchor; don’t merge into this).
 - `main` — Tracks **upstream/main**; I periodically fast-forward and mirror it to this fork.
