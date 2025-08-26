@@ -1,0 +1,21 @@
+#!/bin/sh
+# Block any push to upstream org (free5gc/*)
+remote_name="$1"; remote_url="$2"
+
+case "$remote_name|$remote_url" in
+  upstream*|*github.com/free5gc/*)
+    echo "❌ Blocked: refusing to push to upstream ($remote_name $remote_url). Push to origin instead." >&2
+    exit 1
+    ;;
+esac
+
+# Also block if pushURL resolves to free5gc/*
+pushurl="$(git remote get-url --push "$remote_name" 2>/dev/null || true)"
+case "$pushurl" in
+  *github.com/free5gc/*)
+    echo "❌ Blocked: pushURL for '$remote_name' points to free5gc/* ($pushurl)." >&2
+    exit 1
+    ;;
+esac
+
+exit 0
