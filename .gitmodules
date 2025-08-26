@@ -47,3 +47,5 @@
 	url = https://github.com/kk-free5gc/amf.git
 [submodule "NFs/smf"]
 	url = https://github.com/kk-free5gc/smf.git
+[submodule "NFs/pcf"]
+	url = https://github.com/kk-free5gc/pcf.git
