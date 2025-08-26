@@ -44,6 +44,6 @@
 	path = ci-test
 	url = https://github.com/free5gc/ci-test.git
 [submodule "NFs/amf"]
-	url = https://github.com/lori041987/amf.git
+	url = https://github.com/kk-free5gc/amf.git
 [submodule "NFs/smf"]
-	url = https://github.com/lori041987/smf.git
+	url = https://github.com/kk-free5gc/smf.git
