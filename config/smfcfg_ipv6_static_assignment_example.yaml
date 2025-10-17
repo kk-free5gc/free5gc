@@ -1,0 +1,152 @@
+# Example SMF Configuration with IPv6 Static Assignment Validation
+# This demonstrates the containment rule validation for IPv6 static assignments
+
+info:
+  version: 1.0.7
+  description: SMF configuration with IPv6 static assignment examples
+
+configuration:
+  smfName: SMF
+  sbi:
+    scheme: http
+    registerIPv4: 127.0.0.2
+    bindingIPv4: 127.0.0.2
+    port: 8000
+
+  pfcp:
+    listenAddr: 127.0.0.8
+    externalAddr: 127.0.0.8
+    nodeID: 127.0.0.8
+
+  nrfUri: http://127.0.0.10:8000
+
+  serviceNameList:
+    - nsmf-pdusession
+    - nsmf-event-exposure
+
+  snssaiInfos:
+    - sNssai:
+        sst: 1
+        sd: "010203"
+      dnnInfos:
+        - dnn: internet
+          dns:
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+
+  userplaneInformation:
+    upNodes:
+      UPF:
+        type: UPF
+        nodeID: 127.0.0.8
+        addr: 127.0.0.8
+        sNssaiUpfInfos:
+          - sNssai:
+              sst: 1
+              sd: "010203"
+            dnnUpfInfoList:
+              # Example 1: Valid static assignments within pool
+              - dnn: internet
+                # IPv4 pools (existing)
+                pools:
+                  - cidr: 10.60.0.0/16
+
+                # IPv6 pools
+                ipv6Pools:
+                  - prefix: 2001:db8:cafe::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+
+                # IPv6 static assignments - VALID (within 2001:db8:cafe::/48)
+                ipv6StaticAssignments:
+                  - supi: imsi-208930000000001
+                    address: 2001:db8:cafe:1::100
+                    prefixLength: 64
+                    comment: Valid - falls within 2001:db8:cafe::/48
+
+                  - supi: imsi-208930000000002
+                    address: 2001:db8:cafe:ffff::200
+                    prefixLength: 64
+                    comment: Valid - still within /48 pool
+
+                sessionTypePolicy:
+                  default: ipv4v6
+                  allowed:
+                    - ipv4
+                    - ipv6
+                    - ipv4v6
+
+              # Example 2: Invalid static assignment (will fail validation)
+              # Uncomment to test validation failure:
+              # - dnn: ims
+              #   ipv6Pools:
+              #     - prefix: 2001:db8:beef::/48
+              #       uePrefixLength: 64
+              #       iidAllocation: random
+              #
+              #   # INVALID - 2001:db8:dead::1 is NOT within 2001:db8:beef::/48
+              #   ipv6StaticAssignments:
+              #     - supi: imsi-208930000000003
+              #       address: 2001:db8:dead::1
+              #       prefixLength: 64
+              #       comment: INVALID - outside configured pool
+
+              # Example 3: Multiple pools with static assignments
+              - dnn: enterprise
+                ipv6Pools:
+                  - prefix: 2001:db8:1000::/40
+                    uePrefixLength: 64
+                    iidAllocation: random
+
+                ipv6StaticPools:
+                  - prefix: 2001:db8:2000::/40
+                    uePrefixLength: 64
+                    iidAllocation: manual
+
+                # Valid assignments from both pools
+                ipv6StaticAssignments:
+                  - supi: imsi-208930000000010
+                    address: 2001:db8:1000:1::50
+                    prefixLength: 64
+                    comment: Valid - from ipv6Pools
+
+                  - supi: imsi-208930000000011
+                    address: 2001:db8:2000:ff::100
+                    prefixLength: 64
+                    comment: Valid - from ipv6StaticPools
+
+                sessionTypePolicy:
+                  default: ipv6
+                  allowed:
+                    - ipv6
+                    - ipv4v6
+
+        interfaces:
+          - interfaceType: N3
+            endpoints:
+              - 127.0.0.8
+            networkInstances:
+              - internet
+
+    links:
+      - A: UPF
+        B: UPF
+
+  plmnList:
+    - mcc: "208"
+      mnc: "93"
+
+  t3591:
+    enable: true
+    expireTime: 16s
+    maxRetryTimes: 3
+
+  t3592:
+    enable: true
+    expireTime: 16s
+    maxRetryTimes: 3
+
+logger:
+  enable: true
+  level: info
+  reportCaller: false
