@@ -27,47 +27,126 @@ gtpu:
 # Supported DNNs
 # List of Data Network Names (DNN) supported by this UPF.
 dnnList:
+  - dnn: fast.t-mobile.com # Data Network Name
+    cidr: 10.111.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    ipv6:
+      prefix: 2001:db8:0111::/48
+      uePrefixLength: 64
+      allocation: random
+      raProfile: default
+  - dnn: fast.t-mobile.com # Data Network Name
+    cidr: 10.121.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: fast.t-mobile.com # Data Network Name
+    cidr: 10.131.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: fast.t-mobile.com # Data Network Name
+    cidr: 10.141.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: fast.t-mobile.com # Data Network Name
+    cidr: 10.151.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: fast.t-mobile.com # Data Network Name
+    cidr: 10.161.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: fast.t-mobile.com # Data Network Name
+    cidr: 10.171.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: internet # Data Network Name
-    cidr: 10.61.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.112.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: internet # Data Network Name
-    cidr: 10.71.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.122.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: internet # Data Network Name
-    cidr: 10.81.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.132.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: internet # Data Network Name
-    cidr: 10.91.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.142.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: internet # Data Network Name
+    cidr: 10.152.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: internet # Data Network Name
+    cidr: 10.162.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: internet # Data Network Name
+    cidr: 10.172.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: ims # Data Network Name
-    cidr: 10.62.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.113.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: ims # Data Network Name
-    cidr: 10.72.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.123.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: ims # Data Network Name
-    cidr: 10.82.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.133.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: ims # Data Network Name
-    cidr: 10.92.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
-  - dnn: wnctest # Data Network Name
-    cidr: 10.63.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
-  - dnn: wnctest # Data Network Name
-    cidr: 10.73.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
-  - dnn: wnctest # Data Network Name
-    cidr: 10.83.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
-  - dnn: wnctest # Data Network Name
-    cidr: 10.93.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
-  - dnn: vzwadmin # Data Network Name
-    cidr: 10.64.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
-  - dnn: vzwadmin # Data Network Name
-    cidr: 10.74.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
-  - dnn: vzwadmin # Data Network Name
-    cidr: 10.84.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
-  - dnn: vzwadmin # Data Network Name
-    cidr: 10.94.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.143.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: ims # Data Network Name
+    cidr: 10.153.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: ims # Data Network Name
+    cidr: 10.163.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: ims # Data Network Name
+    cidr: 10.173.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: sos # Data Network Name
+    cidr: 10.114.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: sos # Data Network Name
+    cidr: 10.124.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: sos # Data Network Name
+    cidr: 10.134.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: sos # Data Network Name
+    cidr: 10.144.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: sos # Data Network Name
+    cidr: 10.154.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: sos # Data Network Name
+    cidr: 10.164.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: sos # Data Network Name
+    cidr: 10.174.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: V5GA01INTERNET # Data Network Name
-    cidr: 10.65.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.115.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: V5GA01INTERNET # Data Network Name
-    cidr: 10.75.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.125.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: V5GA01INTERNET # Data Network Name
-    cidr: 10.85.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.135.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
   - dnn: V5GA01INTERNET # Data Network Name
-    cidr: 10.95.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    cidr: 10.145.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: V5GA01INTERNET # Data Network Name
+    cidr: 10.155.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: V5GA01INTERNET # Data Network Name
+    cidr: 10.165.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: V5GA01INTERNET # Data Network Name
+    cidr: 10.175.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: vzwadmin # Data Network Name
+    cidr: 10.116.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: vzwadmin # Data Network Name
+    cidr: 10.126.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: vzwadmin # Data Network Name
+    cidr: 10.136.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: vzwadmin # Data Network Name
+    cidr: 10.146.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: vzwadmin # Data Network Name
+    cidr: 10.156.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: vzwadmin # Data Network Name
+    cidr: 10.166.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: vzwadmin # Data Network Name
+    cidr: 10.176.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: wnctest # Data Network Name
+    cidr: 10.115.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: wnctest # Data Network Name
+    cidr: 10.125.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: wnctest # Data Network Name
+    cidr: 10.135.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: wnctest # Data Network Name
+    cidr: 10.145.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: wnctest # Data Network Name
+    cidr: 10.155.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: wnctest # Data Network Name
+    cidr: 10.165.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+  - dnn: wnctest # Data Network Name
+    cidr: 10.175.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+
     # natifname: eth0
+
+# Router Advertisement profiles for IPv6
+routerAdvertisements:
+  default:
+    enable: true
+    routerAddress: fe80::1
+    prefixLength: 64
+    linkMtu: 1500
+    flags: 0xC0  # Managed address configuration (M) and Other configuration (O)
+    lifetime: 1800
+    reachableTimer: 0
+    retransTimer: 0
+    dns:
+      - 2001:4860:4860::8888
+      - 2001:4860:4860::8844
 
 # Logging Configuration
 # Controls logging level and output for the UPF.

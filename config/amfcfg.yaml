@@ -29,32 +29,48 @@ configuration:
   # Guami (Globally Unique AMF ID) list supported by this AMF
   servedGuamiList:
     # <GUAMI> = <MCC><MNC><AMF ID>
+    # CHT
     - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
         mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
         mnc: 11 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       amfId: cafe00 # AMF identifier (3 bytes hex string, range: 000000~FFFFFF)
+    # Amarisoft
     - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
         mcc: 001 # Mobile Country Code (3 digits string, digit: 0~9)
         mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       amfId: cafe01 # AMF identifier (3 bytes hex string, range: 000000~FFFFFF)
+    # Verizon
     - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
         mcc: 311 # Mobile Country Code (3 digits string, digit: 0~9)
         mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       amfId: cafe02 # AMF identifier (3 bytes hex string, range: 000000~FFFFFF)
+    # T-mobile
+    - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+        mcc: 310 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 260 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+      amfId: cafe03 # AMF identifier (3 bytes hex string, range: 000000~FFFFFF)
 
   # the TAI (Tracking Area Identifier) list supported by this AMF
   supportTaiList:
+    # CHT
     - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
         mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
         mnc: 11 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       tac: 000001 # Tracking Area Code (3 bytes hex string, range: 000000~FFFFFF)
+    # Amarisoft
     - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
         mcc: 001 # Mobile Country Code (3 digits string, digit: 0~9)
         mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       tac: 000001 # Tracking Area Code (3 bytes hex string, range: 000000~FFFFFF)
+    # Verizon
     - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
         mcc: 311 # Mobile Country Code (3 digits string, digit: 0~9)
         mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+      tac: 000001 # Tracking Area Code (3 bytes hex string, range: 000000~FFFFFF)
+    # T-mobile
+    - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+        mcc: 310 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 260 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       tac: 000001 # Tracking Area Code (3 bytes hex string, range: 000000~FFFFFF)
 
   # the PLMNs (Public land mobile network) list supported by this AMF
@@ -64,7 +80,13 @@ configuration:
         mnc: 11 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       snssaiList: # the S-NSSAI (Single Network Slice Selection Assistance Information) list supported by this AMF
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          # sd omitted so this entry matches requests with SST=1 and no SD
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -76,7 +98,13 @@ configuration:
         mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       snssaiList: # the S-NSSAI (Single Network Slice Selection Assistance Information) list supported by this AMF
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          # sd omitted so this entry matches requests with SST=1 and no SD
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -88,7 +116,31 @@ configuration:
         mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
       snssaiList: # the S-NSSAI (Single Network Slice Selection Assistance Information) list supported by this AMF
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          # sd omitted so this entry matches requests with SST=1 and no SD
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+    - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+        mcc: 310 # Mobile Country Code (3 digits string, digit: 0~9)
+        mnc: 260 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+      snssaiList: # the S-NSSAI (Single Network Slice Selection Assistance Information) list supported by this AMF
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          # sd omitted so this entry matches requests with SST=1 and no SD
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -98,11 +150,14 @@ configuration:
 
   # the DNN (Data Network Name) list supported by this AMF
   supportDnnList:
+    - fast.t-mobile.com
     - internet
     - ims
-    - wnctest
-    - vzwadmin
+    - sos
     - V5GA01INTERNET
+    - vzwadmin
+    - wnctest
+
   nrfUri: http://127.0.0.10:8000 # a valid URI of NRF
   nrfCertPem: cert/nrf.pem # NRF Certificate
 

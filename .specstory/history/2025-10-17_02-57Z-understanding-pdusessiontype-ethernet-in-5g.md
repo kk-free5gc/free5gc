@@ -18,3 +18,15 @@ PduSessionType_ETHERNET indicates a 5G PDU Session that transports raw Ethernet 
 
 ---
 
+_**User (2025-10-17 09:07Z)**_
+
+staticPools, what does this used for? what is different from pools?
+
+---
+
+_**Assistant (copilot/gpt-5)**_
+
+
+
+---
+
