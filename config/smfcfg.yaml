@@ -617,6 +617,17 @@ configuration:
   urrThreshold: 500000 # default usage report threshold in bytes
   requestedUnit: 1000
 
+  # WNC: Router Advertisement Configuration for IPv6
+  # Controls how SMF delivers Router Advertisements to UPF for forwarding to UEs
+  routerAdvertisement:
+    deliveryMethod: http  # Delivery method: "http" or "pfcp"
+                          # - "http": Send RA via HTTP POST to UPF's /upf/v1/inject-ra endpoint (Phase 3.2.4)
+                          #           Requires UPF's httpService.enable: true in upfcfg.yaml
+                          # - "pfcp": Send RA via PFCP message to UPF (not yet implemented - Phase 3.2+)
+                          # Default: "http" (recommended for now)
+    upfHttpPort: 8080     # UPF HTTP server port (default: 8080)
+                          # Must match the port configured in UPF's httpService.port
+
 # Logging Configuration
 logger:
   enable: true # true or false

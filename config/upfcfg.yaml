@@ -148,6 +148,21 @@ routerAdvertisements:
       - 2001:4860:4860::8888
       - 2001:4860:4860::8844
 
+# HTTP Service Configuration
+# WNC: HTTP server for Router Advertisement (RA) injection endpoint
+# This setting controls whether the UPF starts an HTTP server to receive RA packets from SMF.
+# The delivery method (HTTP vs PFCP) is controlled by SMF configuration, NOT here.
+#
+# enable: true  - Start HTTP server, SMF can deliver RAs via HTTP (recommended for now)
+# enable: false - No HTTP server, SMF HTTP delivery will fail with connection refused
+#                 Note: Setting this to false does NOT make SMF use PFCP instead.
+#                 To use PFCP delivery, configure SMF's routerAdvertisement.deliveryMethod
+#                 (PFCP delivery not yet implemented - Phase 3.2+)
+httpService:
+  enable: true   # Required when SMF uses HTTP delivery method (current default)
+  port: 8080     # HTTP server port
+  addr: 127.0.0.1  # Listen address for HTTP service
+
 # Logging Configuration
 # Controls logging level and output for the UPF.
 logger:
