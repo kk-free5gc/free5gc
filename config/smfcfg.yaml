@@ -474,25 +474,75 @@ configuration:
                 staticPools:
                   - cidr: 10.152.100.0/24
               - dnn: ims
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4
+                    - IPV6
+                    - IPV4V6
                 pools:
                   - cidr: 10.153.0.0/16
                 staticPools:
                   - cidr: 10.153.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0153::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0153:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
               - dnn: sos
                 pools:
                   - cidr: 10.154.0.0/16
                 staticPools:
                   - cidr: 10.154.100.0/24
               - dnn: V5GA01INTERNET
+                pduSessionTypes:
+                  #defaultSessionType: IPV4V6
+                  defaultSessionType: IPV4
+                  allowedSessionTypes:
+                    - IPV4
+                    #- IPV6
+                    #- IPV4V6
                 pools:
                   - cidr: 10.155.0.0/16
                 staticPools:
                   - cidr: 10.155.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0155::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0155:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
               - dnn: vzwadmin
+                pduSessionTypes:
+                  #defaultSessionType: IPV4V6
+                  defaultSessionType: IPV4
+                  allowedSessionTypes:
+                    - IPV4
+                    #- IPV6
+                    #- IPV4V6
                 pools:
                   - cidr: 10.156.0.0/16
                 staticPools:
                   - cidr: 10.156.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0156::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0156:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
               - dnn: wnctest
                 pools:
                   - cidr: 10.157.0.0/16

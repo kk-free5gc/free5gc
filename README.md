@@ -39,8 +39,54 @@ Detailed changes for each release are documented in the release notes. Detailed 
 free5GC is now under [Apache 2.0](https://github.com/free5gc/free5gc/blob/master/LICENSE.txt) license.
 
 ## After clone:
+```bash
 git submodule update --init --recursive --checkout
 ./scripts/install-guards.sh
+```
+
+## ⚠️ WNC: IMPORTANT - go-gtp5gnl Configuration Required
+
+**Before building Free5GC, you must configure the go-gtp5gnl library with system-specific kernel parameters.**
+
+### Quick Setup (Required on Each System)
+
+```bash
+# 1. Navigate to go-gtp5gnl directory
+cd ../go-gtp5gnl
+
+# 2. Generate system-specific configuration
+./scripts/detect_kernel_params.sh > go-gtp5gnl.yaml
+
+# 3. Verify configuration
+./scripts/detect_kernel_params.sh --verify
+
+# 4. Return to free5gc directory
+cd ../free5gc
+
+# 5. Build Free5GC
+make nfs
+```
+
+### Why This Is Required
+
+go-gtp5gnl is used by the UPF (User Plane Function) to communicate with the gtp5g kernel module via netlink. The netlink message sizes depend on kernel-specific parameters that vary by system:
+
+- **PAGE_SIZE**: System page size (4KB, 8KB, 16KB, or 64KB)
+- **CONFIG_MAX_SKB_FRAGS**: Kernel SKB fragment configuration (16, 17, 18, etc.)
+- **SKB_OVERHEAD**: Socket buffer overhead calculation
+
+**Using incorrect values causes:**
+- ❌ Netlink communication failures (EMSGSIZE errors)
+- ❌ UPF unable to program gtp5g rules
+- ❌ Data plane failures (no UE traffic forwarding)
+
+### For More Details
+
+See the go-gtp5gnl configuration documentation:
+- **Quick Guide**: `../go-gtp5gnl/README.md`
+- **Detailed Instructions**: `../go-gtp5gnl/CONFIG.md`
+
+**Note**: Configuration must be regenerated on each deployment target system with different kernel versions or architectures.
 
 ## Branches
 
@@ -48,3 +94,6 @@ git submodule update --init --recursive --checkout
 - `main` — Tracks **upstream/main**; I periodically fast-forward and mirror it to this fork.
 - `my-changes-v4.0.1` — My custom changes based on **v4.0.1** baseline.
 
+## Logs
+
+Remember, go-gtp5gnl logs appear in the UPF userspace logs, while gtp5g logs appear in dmesg.
