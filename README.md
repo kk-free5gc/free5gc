@@ -46,7 +46,7 @@ git submodule update --init --recursive --checkout
 
 ## ⚠️ WNC: IMPORTANT - go-gtp5gnl Configuration Required
 
-**Before building Free5GC, you must configure the go-gtp5gnl library with system-specific kernel parameters.**
+**Before building free5GC, you must configure the go-gtp5gnl library with system-specific kernel parameters.**
 
 ### Quick Setup (Required on Each System)
 
@@ -63,7 +63,7 @@ cd ../go-gtp5gnl
 # 4. Return to free5gc directory
 cd ../free5gc
 
-# 5. Build Free5GC
+# 5. Build free5GC
 make nfs
 ```
 
@@ -88,6 +88,27 @@ See the go-gtp5gnl configuration documentation:
 
 **Note**: Configuration must be regenerated on each deployment target system with different kernel versions or architectures.
 
+## ⚠️ WNC: PFCP vs Netlink Trigger Bitmaps (three formats!)
+
+Router Solicitation reporting carries the same “Eveth” concept through **three different encodings**:
+
+1. **gtp5g netlink USAReport bitmap** – 32 bits (kernel → go-gtp5gnl). Eveth is bit 15 (`0x00008000`).  
+   - `go-gtp5gnl/attr_report.go` must decode this as little-endian so `r.USARTrigger == 0x00008000`.  
+   - `UsageReportTrigger.SetReportingTrigger()` switches on `USAR_TRIG_*` (the kernel bit positions declared at the top of `free5gc/NFs/upf/internal/report/report.go`) and sets internal `RPT_TRIG_*` (the PFCP flags in the same file).  
+   - Logging tip: `[go-gtp5gnl] URR 7 raw trigger bytes … → LE=0x00008000`.
+
+2. **PFCP ReportingTriggers IE** (TS 29.244, Create/Update URR) – 2/3 bytes. Eveth lives at bit 12 (`0x1000`), i.e. bit 5 (`0x10`) of octet 6.  
+   - `buildUrrAttrs()` must serialize `rptTrig.MarshalReportingTriggersIE()` (see the comment block in `free5gc/NFs/upf/internal/report/report.go` that maps `RPT_TRIG_*` to octets) and append `URR_EVENT_ID/THRESHOLD` when `rptTrig.EVETH() == true`.  
+   - Log the octets before sending: `URR %d PFCP ReportingTriggers octets=%02x%02x (expect oct6 bit 0x10 for Eveth)`.
+
+3. **PFCP UsageReportTrigger IE** (Session Report Request → SMF) – 3 bytes. Eveth is bit 8 (`0x80`) of octet 6.  
+   - `UsageReportTrigger.IE()` must map `RPT_TRIG_*` to the TS 29.244 layout and set `buf[1] |= 0x80`.  
+   - Log what you send: `[UPF][PFCP] UsageReportTrigger flags=… → octets [%02x %02x %02x] (expect oct6 bit 0x80)`.  
+   - On the SMF side log the decoded octets too, so if Eveth is still false you see the mismatch immediately.  
+   - Reference: go-pfcp `HasEVETH()`/`UsageReportTrigger()` logic (Eveth uses `has8thBit(v[1])` for Session Report Request). The bit layout comments in `UsageReportTrigger.IE()` show every octet and which `RPT_TRIG_*` bit sets it.
+
+**Debug flow:** gtp5g (kernel) → go-gtp5gnl log → buffnetlink log → PFCP builder logs → SMF PFCP handler log. If any link shows the wrong bit, fix the serializer at that stage.
+
 ## Branches
 
 - `baseline-v4.0.1` — Frozen snapshot at upstream tag **v4.0.1** (clean anchor; don’t merge into this).
@@ -97,3 +118,100 @@ See the go-gtp5gnl configuration documentation:
 ## Logs
 
 Remember, go-gtp5gnl logs appear in the UPF userspace logs, while gtp5g logs appear in dmesg.
+
+## How to Manage MongoDB (Subscriber Data)
+
+### Update a Subscriber's PDU Session Types in MongoDB
+
+#### PDU Session Type Policy Layers
+
+1. **SMF global capability** — currently fixed inside `NFs/smf/internal/context/context.go` (upstream default was `"IPv4"`, we set it to `"IPv4v6"` so IPv6-only DNNs are allowed).
+2. **Subscriber WebGUI** — per UE/DNN `defaultSessionType` and `allowedSessionTypes` that will save in MongoDB.
+3. **`smfcfg.yaml`** — per DNN fallback policy when Mongo lacks `pduSessionTypes` for that UE/S-NSSAI.
+
+```bash
+# 1. Log into the free5GC subscriber database
+mongosh "mongodb://127.0.0.1:27017/free5gc"
+
+# 2. Inspect UE imsi-466110000013068's SessionManagementSubscriptionData
+db.getCollection("subscriptionData.provisionedData.smData").find({
+  ueId: "imsi-466110000013068",
+  servingPlmnId: "46611"
+}).pretty();
+
+# 3. Change that UE's V5GA01INTERNET DNN to request IPv6-only sessions
+db.getCollection("subscriptionData.provisionedData.smData").updateOne(
+  {
+    ueId: "imsi-466110000013068",
+    servingPlmnId: "46611",
+    "singleNssai.sst": 1,
+    "singleNssai.sd": "050601"
+  },
+  {
+    $set: {
+      "dnnConfigurations.vzwadmin.pduSessionTypes.defaultSessionType": "IPV6",
+      "dnnConfigurations.vzwadmin.pduSessionTypes.allowedSessionTypes": [ "IPV6" ]
+    }
+  }
+);
+```
+
+Successful updates return:
+
+```json
+{
+  "acknowledged": true,
+  "insertedId": null,
+  "matchedCount": 1,
+  "modifiedCount": 1,
+  "upsertedCount": 0
+}
+```
+
+### How to Dump the Whole Database into a Human-Readable JSON File
+
+1. Create a full dump (binary BSON):
+
+```sh
+mongodump --uri "mongodb://127.0.0.1:27017/free5gc" --out ./free5gc_dump
+```
+
+2. Convert those BSON files to human-readable JSON:
+
+- For a single file:
+```sh
+bsondump free5gc_dump/free5gc/registrationData.bson > registrationData.json
+```
+
+- Or all collections into one JSON file (append mode):
+```sh
+bash -c '> free5gc_all.json && for bson in free5gc_dump/free5gc/*.bson; do bsondump "$bson" >> free5gc_all.json; done'
+```
+
+## How to Write SDF Filter in UPF
+
+Example: RS SDF filter - `rsFlowDesc`
+
+**File:** `free5gc/NFs/smf/internal/context/datapath.go`
+
+gtp5g normalizes `permit in` flows as downlink and `permit out` flows as uplink because "in"/"out" are from the UPF's perspective: "in" means packets entering the core (so they're downlink relative to UE), "out" means packets leaving toward the UE (uplink). That's why your RS PDR summary shows:
+
+- `permit out ...`: Dir=UL
+- `permit in ...`: Dir=DL
+
+Since Router Solicitations are uplink (UE → ff02::2), use `permit out` so the kernel installs the rule as Dir=UL. The remaining problem is the address order: even with Dir=UL, the kernel is still showing IPv6-Src=ff02::2, IPv6-Dst=fe80::/64. To get a rule that actually matches fe80::/64 → ff02::2, flip the addresses in the string you send:
+
+```go
+rsFlowDesc := "permit out 58 from ff02::2 to fe80::/64"
+```
+
+When the kernel normalizes that UL filter, it will flip the endpoints and you'll end up with Dir=UL, Src=fe80::/64, Dst=ff02::2, so the actual RS packets will finally hit the PDR. The logs will then show URR 7 firing, the SMF will get EventID 26, and the Router Advertisement code will run.
+
+
+## Interface
+
+ip -6 addr add 2001:db8::5:5:5:2/64 dev br-ng label br-ng:NGU
+
+## Note
+
+PFCP (SMF → go-pfcp), userspace (go-pfcp → go-gtp5gnl), kernel netlink (go-gtp5gnl → gtp5g).

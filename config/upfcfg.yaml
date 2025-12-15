@@ -20,6 +20,8 @@ gtpu:
   ifList:
     - addr: 5.5.5.2
       type: N3
+    - addr: 2001:db8::5:5:5:2
+      type: N3
       # name: upf.5gc.nctu.me
       # ifname: gtpif
       # mtu: 1400
@@ -124,6 +126,11 @@ dnnList:
       sd: "000BB8"
   - dnn: ims # Data Network Name
     cidr: 10.153.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    ipv6:
+      prefix: 2001:db8:0153::/48
+      uePrefixLength: 64
+      allocation: random
+      raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
       sd: "050601"
@@ -194,6 +201,11 @@ dnnList:
       sd: "000BB8"
   - dnn: V5GA01INTERNET # Data Network Name
     cidr: 10.155.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    ipv6:
+      prefix: 2001:db8:0155::/48
+      uePrefixLength: 64
+      allocation: random
+      raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
       sd: "050601"
@@ -229,6 +241,11 @@ dnnList:
       sd: "000BB8"
   - dnn: vzwadmin # Data Network Name
     cidr: 10.156.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    ipv6:
+      prefix: 2001:db8:0156::/48
+      uePrefixLength: 64
+      allocation: random
+      raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
       sd: "050601"
@@ -314,5 +331,5 @@ httpService:
 # Controls logging level and output for the UPF.
 logger:
   enable: true # true or false
-  level: wnc_trace # how detailed to output, value: wnc_trace, trace, debug, info, warn, error, fatal, panic
+  level: trace # how detailed to output, value: wnc_trace, trace, debug, info, warn, error, fatal, panic
   reportCaller: false # enable the caller report or not, value: true or false

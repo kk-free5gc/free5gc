@@ -55,6 +55,10 @@ configuration:
           dns: # the IP address of DNS
             ipv4: 8.8.8.8
             ipv6: 2001:4860:4860::8888
+          # WNC: Optional wildcard flow descriptions (Open5GS-style catch-all PDRs)
+          # If omitted, defaults to: UL="permit out ip from assigned to any", DL="permit out ip from any to assigned"
+          # defaultUlFlow: "permit out ip from assigned to any"
+          # defaultDlFlow: "permit out ip from any to assigned"
     - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
         sd: 000001 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -312,6 +316,7 @@ configuration:
                     address: 2001:db8:0111:100::11
                     prefixLength: 64
                     comment: UE-2 static IPv6
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: internet
                 pools:
                   - cidr: 10.112.0.0/16
@@ -475,11 +480,9 @@ configuration:
                   - cidr: 10.152.100.0/24
               - dnn: ims
                 pduSessionTypes:
-                  defaultSessionType: IPV4V6
+                  defaultSessionType: IPV6
                   allowedSessionTypes:
-                    - IPV4
                     - IPV6
-                    - IPV4V6
                 pools:
                   - cidr: 10.153.0.0/16
                 staticPools:
@@ -494,6 +497,7 @@ configuration:
                     uePrefixLength: 64
                     iidAllocation: manual
                     raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: sos
                 pools:
                   - cidr: 10.154.0.0/16
@@ -501,12 +505,9 @@ configuration:
                   - cidr: 10.154.100.0/24
               - dnn: V5GA01INTERNET
                 pduSessionTypes:
-                  #defaultSessionType: IPV4V6
-                  defaultSessionType: IPV4
+                  defaultSessionType: IPV4V6
                   allowedSessionTypes:
-                    - IPV4
-                    #- IPV6
-                    #- IPV4V6
+                    - IPV4V6
                 pools:
                   - cidr: 10.155.0.0/16
                 staticPools:
@@ -521,14 +522,12 @@ configuration:
                     uePrefixLength: 64
                     iidAllocation: manual
                     raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: vzwadmin
                 pduSessionTypes:
-                  #defaultSessionType: IPV4V6
-                  defaultSessionType: IPV4
+                  defaultSessionType: IPV4V6
                   allowedSessionTypes:
-                    - IPV4
-                    #- IPV6
-                    #- IPV4V6
+                    - IPV4V6
                 pools:
                   - cidr: 10.156.0.0/16
                 staticPools:
@@ -543,6 +542,7 @@ configuration:
                     uePrefixLength: 64
                     iidAllocation: manual
                     raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: wnctest
                 pools:
                   - cidr: 10.157.0.0/16
@@ -635,6 +635,7 @@ configuration:
           - interfaceType: N3 # the type of the interface (N3 or N9)
             endpoints: # the IP address of this N3/N9 interface on this UPF
               - 5.5.5.2
+              - 2001:db8::5:5:5:2
             networkInstances: # Data Network Name (DNN)
               - fast.t-mobile.com
               - internet
