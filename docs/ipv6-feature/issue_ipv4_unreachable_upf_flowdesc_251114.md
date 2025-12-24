@@ -1,5 +1,17 @@
 # UPF Flow Description Wildcard Handling
 
+**Status**: ✅ RESOLVED (November 25, 2025)
+
+**Update**: This issue led to the comprehensive solution documented in:
+- [issue_gtp5g_sdf_filter_solution_251125.md](issue_gtp5g_sdf_filter_solution_251125.md) - Solution design
+- [issue_gtp5g_sdf_filter_fix_251126.md](issue_gtp5g_sdf_filter_fix_251126.md) - Implementation details
+
+**Current Implementation**: The code now uses session-type-aware wildcards. `ParseFlowDescIPNet()` takes `ueIPv4, ueIPv6` parameters and returns `0.0.0.0/0` for IPv4-only sessions or `::/0` for IPv6-only sessions, instead of the buggy behavior described below.
+
+**Historical Reference**: This document describes the original bug discovery and analysis (November 14, 2025).
+
+---
+
 ## Root Cause Analysis
 - Problem: UE cannot ping 8.8.8.8 even though:
   - UE has IP 10.155.0.1 (PDU Session 1, TEID 2)

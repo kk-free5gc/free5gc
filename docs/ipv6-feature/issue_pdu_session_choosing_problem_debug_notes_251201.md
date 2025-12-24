@@ -1,5 +1,14 @@
 # WNC: IPv4-Only Debug Notes (Dec 2025)
 
+**Status**: ✅ RESOLVED (December 1, 2025)
+
+**Resolution**: SMF now correctly selects PDU session type based on UE capability and subscriber profile. The issue was traced to session type selection logic not properly respecting the `allowedSessionTypes` configuration from subscriber profile and `smfcfg.yaml`.
+
+**Fix Applied**: Enhanced logging and validation in `sm_context.go` to ensure proper session type downgrade when subscriber profile restricts to IPv4-only, even when UE requests IPv4v6.
+
+**Historical Reference**: This document describes the debugging process and instrumentation added to diagnose the issue (December 1, 2025).
+
+---
 
 ## Problem description
 
