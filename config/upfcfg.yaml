@@ -325,7 +325,7 @@ routerAdvertisements:
 httpService:
   enable: true   # Required when SMF uses HTTP delivery method (current default)
   port: 8080     # HTTP server port
-  addr: 127.0.0.1  # Listen address for HTTP service
+  addr: 5.5.5.2  # Listen address for HTTP service
 
 # Logging Configuration
 # Controls logging level and output for the UPF.

@@ -510,6 +510,8 @@ configuration:
                     - IPV4V6
                 pools:
                   - cidr: 10.155.0.0/16
+                    exclude:
+                      - "10.155.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.155.100.0/24
                 ipv6Pools:
@@ -517,6 +519,8 @@ configuration:
                     uePrefixLength: 64
                     iidAllocation: random
                     raProfile: default
+                    exclude:
+                      - "2001:db8:0155::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
                 ipv6StaticPools:
                   - prefix: 2001:db8:0155:100::/64
                     uePrefixLength: 64
@@ -530,6 +534,8 @@ configuration:
                     - IPV4V6
                 pools:
                   - cidr: 10.156.0.0/16
+                    exclude:
+                      - "10.156.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.156.100.0/24
                 ipv6Pools:
@@ -537,6 +543,8 @@ configuration:
                     uePrefixLength: 64
                     iidAllocation: random
                     raProfile: default
+                    exclude:
+                      - "2001:db8:0156::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
                 ipv6StaticPools:
                   - prefix: 2001:db8:0156:100::/64
                     uePrefixLength: 64
