@@ -43,3 +43,5 @@
 [submodule "ci-test"]
 	path = ci-test
 	url = https://github.com/free5gc/ci-test.git
+[submodule "NFs/udr"]
+	url = https://github.com/kk-free5gc/udr.git

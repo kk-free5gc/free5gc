@@ -46,11 +46,21 @@ dnnList:
       sd: "000001"
   - dnn: fast.t-mobile.com # Data Network Name
     cidr: 10.131.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    ipv6:
+      prefix: 2001:db8:0131::/48
+      uePrefixLength: 64
+      allocation: random
+      raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
       sd: "0007D0"
   - dnn: fast.t-mobile.com # Data Network Name
     cidr: 10.141.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    ipv6:
+      prefix: 2001:db8:0141::/48
+      uePrefixLength: 64
+      allocation: random
+      raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
       sd: "000BB8"

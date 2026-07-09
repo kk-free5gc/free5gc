@@ -260,6 +260,8 @@ configuration:
       mnc: 01 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
     - mcc: 311 # Mobile Country Code (3 digits string, digit: 0~9)
       mnc: 480 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+    - mcc: 310 # Mobile Country Code (3 digits string, digit: 0~9)
+      mnc: 260 # Mobile Network Code (2 or 3 digits string, digit: 0~9)
   locality: area1 # Name of the location where a set of AMF, SMF, PCF and UPFs are located
 
   # PFCP (Packet Forwarding Control Protocol) configuration for N4 interface.
@@ -295,6 +297,8 @@ configuration:
                     - IPV4V6
                 pools:
                   - cidr: 10.111.0.0/16
+                    exclude:
+                      - "10.111.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.111.100.0/24
                 ipv6Pools:
@@ -302,6 +306,8 @@ configuration:
                     uePrefixLength: 64
                     iidAllocation: random
                     raProfile: default
+                    exclude:
+                      - "2001:db8:0111::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
                 ipv6StaticPools:
                   - prefix: 2001:db8:0111:100::/64
                     uePrefixLength: 64
@@ -320,31 +326,43 @@ configuration:
               - dnn: internet
                 pools:
                   - cidr: 10.112.0.0/16
+                    exclude:
+                      - "10.112.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.112.100.0/24
               - dnn: ims
                 pools:
                   - cidr: 10.113.0.0/16
+                    exclude:
+                      - "10.113.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.113.100.0/24
               - dnn: sos
                 pools:
                   - cidr: 10.114.0.0/16
+                    exclude:
+                      - "10.114.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.114.100.0/24
               - dnn: V5GA01INTERNET
                 pools:
                   - cidr: 10.115.0.0/16
+                    exclude:
+                      - "10.115.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.115.100.0/24
               - dnn: vzwadmin
                 pools:
                   - cidr: 10.116.0.0/16
+                    exclude:
+                      - "10.116.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.116.100.0/24
               - dnn: wnctest
                 pools:
                   - cidr: 10.117.0.0/16
+                    exclude:
+                      - "10.117.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.117.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
@@ -354,36 +372,50 @@ configuration:
               - dnn: fast.t-mobile.com
                 pools:
                   - cidr: 10.121.0.0/16
+                    exclude:
+                      - "10.121.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.121.100.0/24
               - dnn: internet
                 pools:
                   - cidr: 10.122.0.0/16
+                    exclude:
+                      - "10.122.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.122.100.0/24
               - dnn: ims
                 pools:
                   - cidr: 10.123.0.0/16
+                    exclude:
+                      - "10.123.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.123.100.0/24
               - dnn: sos
                 pools:
                   - cidr: 10.124.0.0/16
+                    exclude:
+                      - "10.124.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.124.100.0/24
               - dnn: V5GA01INTERNET
                 pools:
                   - cidr: 10.125.0.0/16
+                    exclude:
+                      - "10.125.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.125.100.0/24
               - dnn: vzwadmin
                 pools:
                   - cidr: 10.126.0.0/16
+                    exclude:
+                      - "10.126.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.126.100.0/24
               - dnn: wnctest
                 pools:
                   - cidr: 10.127.0.0/16
+                    exclude:
+                      - "10.127.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.127.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
@@ -391,38 +423,71 @@ configuration:
               sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             dnnUpfInfoList: # DNN information list for this S-NSSAI
               - dnn: fast.t-mobile.com
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4
+                    - IPV6
+                    - IPV4V6
                 pools:
                   - cidr: 10.131.0.0/16
+                    exclude:
+                      - "10.131.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.131.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0131::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0131::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0131:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: internet
                 pools:
                   - cidr: 10.132.0.0/16
+                    exclude:
+                      - "10.132.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.132.100.0/24
               - dnn: ims
                 pools:
                   - cidr: 10.133.0.0/16
+                    exclude:
+                      - "10.133.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.133.100.0/24
               - dnn: sos
                 pools:
                   - cidr: 10.134.0.0/16
+                    exclude:
+                      - "10.134.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.134.100.0/24
               - dnn: V5GA01INTERNET
                 pools:
                   - cidr: 10.135.0.0/16
+                    exclude:
+                      - "10.135.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.135.100.0/24
               - dnn: vzwadmin
                 pools:
                   - cidr: 10.136.0.0/16
+                    exclude:
+                      - "10.136.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.136.100.0/24
               - dnn: wnctest
                 pools:
                   - cidr: 10.137.0.0/16
+                    exclude:
+                      - "10.137.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.137.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
@@ -430,38 +495,71 @@ configuration:
               sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             dnnUpfInfoList: # DNN information list for this S-NSSAI
               - dnn: fast.t-mobile.com
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4
+                    - IPV6
+                    - IPV4V6
                 pools:
                   - cidr: 10.141.0.0/16
+                    exclude:
+                      - "10.141.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.141.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0141::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0141::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0141:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: internet
                 pools:
                   - cidr: 10.142.0.0/16
+                    exclude:
+                      - "10.142.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.142.100.0/24
               - dnn: ims
                 pools:
                   - cidr: 10.143.0.0/16
+                    exclude:
+                      - "10.143.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.143.100.0/24
               - dnn: sos
                 pools:
                   - cidr: 10.144.0.0/16
+                    exclude:
+                      - "10.144.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.144.100.0/24
               - dnn: V5GA01INTERNET
                 pools:
                   - cidr: 10.145.0.0/16
+                    exclude:
+                      - "10.145.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.145.100.0/24
               - dnn: vzwadmin
                 pools:
                   - cidr: 10.146.0.0/16
+                    exclude:
+                      - "10.146.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.146.100.0/24
               - dnn: wnctest
                 pools:
                   - cidr: 10.147.0.0/16
+                    exclude:
+                      - "10.147.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.147.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
@@ -471,11 +569,15 @@ configuration:
               - dnn: fast.t-mobile.com
                 pools:
                   - cidr: 10.151.0.0/16
+                    exclude:
+                      - "10.151.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.151.100.0/24
               - dnn: internet
                 pools:
                   - cidr: 10.152.0.0/16
+                    exclude:
+                      - "10.152.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.152.100.0/24
               - dnn: ims
@@ -485,6 +587,8 @@ configuration:
                     - IPV6
                 pools:
                   - cidr: 10.153.0.0/16
+                    exclude:
+                      - "10.153.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.153.100.0/24
                 ipv6Pools:
@@ -492,6 +596,8 @@ configuration:
                     uePrefixLength: 64
                     iidAllocation: random
                     raProfile: default
+                    exclude:
+                      - "2001:db8:0153::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
                 ipv6StaticPools:
                   - prefix: 2001:db8:0153:100::/64
                     uePrefixLength: 64
@@ -501,6 +607,8 @@ configuration:
               - dnn: sos
                 pools:
                   - cidr: 10.154.0.0/16
+                    exclude:
+                      - "10.154.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.154.100.0/24
               - dnn: V5GA01INTERNET
@@ -554,6 +662,8 @@ configuration:
               - dnn: wnctest
                 pools:
                   - cidr: 10.157.0.0/16
+                    exclude:
+                      - "10.157.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.157.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
@@ -563,36 +673,50 @@ configuration:
               - dnn: fast.t-mobile.com
                 pools:
                   - cidr: 10.161.0.0/16
+                    exclude:
+                      - "10.161.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.161.100.0/24
               - dnn: internet
                 pools:
                   - cidr: 10.162.0.0/16
+                    exclude:
+                      - "10.162.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.162.100.0/24
               - dnn: ims
                 pools:
                   - cidr: 10.163.0.0/16
+                    exclude:
+                      - "10.163.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.163.100.0/24
               - dnn: sos
                 pools:
                   - cidr: 10.164.0.0/16
+                    exclude:
+                      - "10.164.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.164.100.0/24
               - dnn: V5GA01INTERNET
                 pools:
                   - cidr: 10.165.0.0/16
+                    exclude:
+                      - "10.165.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.165.100.0/24
               - dnn: vzwadmin
                 pools:
                   - cidr: 10.166.0.0/16
+                    exclude:
+                      - "10.166.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.166.100.0/24
               - dnn: wnctest
                 pools:
                   - cidr: 10.167.0.0/16
+                    exclude:
+                      - "10.167.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.167.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
@@ -602,36 +726,50 @@ configuration:
               - dnn: fast.t-mobile.com
                 pools:
                   - cidr: 10.171.0.0/16
+                    exclude:
+                      - "10.171.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.171.100.0/24
               - dnn: internet
                 pools:
                   - cidr: 10.172.0.0/16
+                    exclude:
+                      - "10.172.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.172.100.0/24
               - dnn: ims
                 pools:
                   - cidr: 10.173.0.0/16
+                    exclude:
+                      - "10.173.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.173.100.0/24
               - dnn: sos
                 pools:
                   - cidr: 10.174.0.0/16
+                    exclude:
+                      - "10.174.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.174.100.0/24
               - dnn: V5GA01INTERNET
                 pools:
                   - cidr: 10.175.0.0/16
+                    exclude:
+                      - "10.175.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.175.100.0/24
               - dnn: vzwadmin
                 pools:
                   - cidr: 10.176.0.0/16
+                    exclude:
+                      - "10.176.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.176.100.0/24
               - dnn: wnctest
                 pools:
                   - cidr: 10.177.0.0/16
+                    exclude:
+                      - "10.177.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.177.100.0/24
 
