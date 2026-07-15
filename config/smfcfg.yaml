@@ -157,6 +157,38 @@ configuration:
             ipv6: 2001:4860:4860::8888
     - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+        sd: 000BB9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+      dnnInfos: # DNN information list
+        - dnn: fast.t-mobile.com # Data Network Name
+          dns: # the IP address of DNS
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+        - dnn: internet # Data Network Name
+          dns: # the IP address of DNS
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+        - dnn: ims # Data Network Name
+          dns: # the IP address of DNS
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+        - dnn: sos # Data Network Name
+          dns: # the IP address of DNS
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+        - dnn: V5GA01INTERNET # Data Network Name
+          dns: # the IP address of DNS
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+        - dnn: vzwadmin # Data Network Name
+          dns: # the IP address of DNS
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+        - dnn: wnctest # Data Network Name
+          dns: # the IP address of DNS
+            ipv4: 8.8.8.8
+            ipv6: 2001:4860:4860::8888
+    - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
+        sst: 1 # Slice/Service Type (uinteger, range: 0~255)
         sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
       dnnInfos: # DNN information list
         - dnn: fast.t-mobile.com # Data Network Name
@@ -377,12 +409,31 @@ configuration:
                 staticPools:
                   - cidr: 10.121.100.0/24
               - dnn: internet
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4
+                    - IPV6
+                    - IPV4V6
                 pools:
                   - cidr: 10.122.0.0/16
                     exclude:
                       - "10.122.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.122.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0122::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0122::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0122:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: ims
                 pools:
                   - cidr: 10.123.0.0/16
@@ -564,15 +615,34 @@ configuration:
                   - cidr: 10.147.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
               sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-              sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+              sd: 000BB9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             dnnUpfInfoList: # DNN information list for this S-NSSAI
               - dnn: fast.t-mobile.com
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4
+                    - IPV6
+                    - IPV4V6
                 pools:
                   - cidr: 10.151.0.0/16
                     exclude:
                       - "10.151.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.151.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0151::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0151::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0151:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: internet
                 pools:
                   - cidr: 10.152.0.0/16
@@ -581,29 +651,12 @@ configuration:
                 staticPools:
                   - cidr: 10.152.100.0/24
               - dnn: ims
-                pduSessionTypes:
-                  defaultSessionType: IPV6
-                  allowedSessionTypes:
-                    - IPV6
                 pools:
                   - cidr: 10.153.0.0/16
                     exclude:
                       - "10.153.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.153.100.0/24
-                ipv6Pools:
-                  - prefix: 2001:db8:0153::/48
-                    uePrefixLength: 64
-                    iidAllocation: random
-                    raProfile: default
-                    exclude:
-                      - "2001:db8:0153::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
-                ipv6StaticPools:
-                  - prefix: 2001:db8:0153:100::/64
-                    uePrefixLength: 64
-                    iidAllocation: manual
-                    raProfile: default
-                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: sos
                 pools:
                   - cidr: 10.154.0.0/16
@@ -612,53 +665,19 @@ configuration:
                 staticPools:
                   - cidr: 10.154.100.0/24
               - dnn: V5GA01INTERNET
-                pduSessionTypes:
-                  defaultSessionType: IPV4V6
-                  allowedSessionTypes:
-                    - IPV4V6
                 pools:
                   - cidr: 10.155.0.0/16
                     exclude:
                       - "10.155.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.155.100.0/24
-                ipv6Pools:
-                  - prefix: 2001:db8:0155::/48
-                    uePrefixLength: 64
-                    iidAllocation: random
-                    raProfile: default
-                    exclude:
-                      - "2001:db8:0155::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
-                ipv6StaticPools:
-                  - prefix: 2001:db8:0155:100::/64
-                    uePrefixLength: 64
-                    iidAllocation: manual
-                    raProfile: default
-                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: vzwadmin
-                pduSessionTypes:
-                  defaultSessionType: IPV4V6
-                  allowedSessionTypes:
-                    - IPV4V6
                 pools:
                   - cidr: 10.156.0.0/16
                     exclude:
                       - "10.156.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.156.100.0/24
-                ipv6Pools:
-                  - prefix: 2001:db8:0156::/48
-                    uePrefixLength: 64
-                    iidAllocation: random
-                    raProfile: default
-                    exclude:
-                      - "2001:db8:0156::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
-                ipv6StaticPools:
-                  - prefix: 2001:db8:0156:100::/64
-                    uePrefixLength: 64
-                    iidAllocation: manual
-                    raProfile: default
-                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: wnctest
                 pools:
                   - cidr: 10.157.0.0/16
@@ -667,8 +686,8 @@ configuration:
                 staticPools:
                   - cidr: 10.157.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
-              sst: 2 # Slice/Service Type (uinteger, range: 0~255)
-              sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+              sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             dnnUpfInfoList: # DNN information list for this S-NSSAI
               - dnn: fast.t-mobile.com
                 pools:
@@ -685,12 +704,29 @@ configuration:
                 staticPools:
                   - cidr: 10.162.100.0/24
               - dnn: ims
+                pduSessionTypes:
+                  defaultSessionType: IPV6
+                  allowedSessionTypes:
+                    - IPV6
                 pools:
                   - cidr: 10.163.0.0/16
                     exclude:
                       - "10.163.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.163.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0163::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0163::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0163:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: sos
                 pools:
                   - cidr: 10.164.0.0/16
@@ -699,19 +735,53 @@ configuration:
                 staticPools:
                   - cidr: 10.164.100.0/24
               - dnn: V5GA01INTERNET
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4V6
                 pools:
                   - cidr: 10.165.0.0/16
                     exclude:
                       - "10.165.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.165.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0165::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0165::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0165:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: vzwadmin
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4V6
                 pools:
                   - cidr: 10.166.0.0/16
                     exclude:
                       - "10.166.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.166.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0166::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0166::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0166:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: wnctest
                 pools:
                   - cidr: 10.167.0.0/16
@@ -720,8 +790,8 @@ configuration:
                 staticPools:
                   - cidr: 10.167.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
-              sst: 3 # Slice/Service Type (uinteger, range: 0~255)
-              sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+              sst: 2 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             dnnUpfInfoList: # DNN information list for this S-NSSAI
               - dnn: fast.t-mobile.com
                 pools:
@@ -772,6 +842,59 @@ configuration:
                       - "10.177.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.177.100.0/24
+          - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
+              sst: 3 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 050603 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            dnnUpfInfoList: # DNN information list for this S-NSSAI
+              - dnn: fast.t-mobile.com
+                pools:
+                  - cidr: 10.181.0.0/16
+                    exclude:
+                      - "10.181.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
+                staticPools:
+                  - cidr: 10.181.100.0/24
+              - dnn: internet
+                pools:
+                  - cidr: 10.182.0.0/16
+                    exclude:
+                      - "10.182.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
+                staticPools:
+                  - cidr: 10.182.100.0/24
+              - dnn: ims
+                pools:
+                  - cidr: 10.183.0.0/16
+                    exclude:
+                      - "10.183.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
+                staticPools:
+                  - cidr: 10.183.100.0/24
+              - dnn: sos
+                pools:
+                  - cidr: 10.184.0.0/16
+                    exclude:
+                      - "10.184.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
+                staticPools:
+                  - cidr: 10.184.100.0/24
+              - dnn: V5GA01INTERNET
+                pools:
+                  - cidr: 10.185.0.0/16
+                    exclude:
+                      - "10.185.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
+                staticPools:
+                  - cidr: 10.185.100.0/24
+              - dnn: vzwadmin
+                pools:
+                  - cidr: 10.186.0.0/16
+                    exclude:
+                      - "10.186.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
+                staticPools:
+                  - cidr: 10.186.100.0/24
+              - dnn: wnctest
+                pools:
+                  - cidr: 10.187.0.0/16
+                    exclude:
+                      - "10.187.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
+                staticPools:
+                  - cidr: 10.187.100.0/24
 
         # The IP address for the N3 interface must match the IP bound in the UPF N3 interface.
         # If UPF binds to a specific IP, set that same IP here.

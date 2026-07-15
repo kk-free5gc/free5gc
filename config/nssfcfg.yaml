@@ -40,6 +40,8 @@ configuration:
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -57,6 +59,8 @@ configuration:
           sd: 0007D0 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -76,6 +80,8 @@ configuration:
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -93,6 +99,8 @@ configuration:
           sd: 0007D0 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -130,11 +138,18 @@ configuration:
           nsiId: 13
     - snssai: # S-NSSAI of this NSI
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
       nsiInformationList: # Information list of this NSI
         # the NRF to be used to select the NFs/services within the selected NSI, and an optonal ID
         - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
           nsiId: 14
+    - snssai: # S-NSSAI of this NSI
+        sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+        sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+      nsiInformationList: # Information list of this NSI
+        # the NRF to be used to select the NFs/services within the selected NSI, and an optonal ID
+        - nrfId: http://127.0.0.10:8000/nnrf-nfm/v1/nf-instances
+          nsiId: 15
     - snssai: # S-NSSAI of this NSI
         sst: 2 # Slice/Service Type (uinteger, range: 0~255)
         # sd omitted so this entry matches requests with SST=1 and no SD
@@ -188,6 +203,8 @@ configuration:
             - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
               sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -207,6 +224,8 @@ configuration:
               sd: 0007D0 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -228,6 +247,8 @@ configuration:
             - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
               sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -247,6 +268,8 @@ configuration:
               sd: 0007D0 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+            - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+              sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
               sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -296,6 +319,8 @@ configuration:
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)        
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -318,6 +343,8 @@ configuration:
           sd: 0007D0 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)        
@@ -342,6 +369,8 @@ configuration:
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)        
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -363,7 +392,9 @@ configuration:
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 0007D0 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)  
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-          sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)  
+          sd: 000BB8 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)  
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)        
