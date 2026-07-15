@@ -88,6 +88,8 @@ configuration:
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -105,6 +107,8 @@ configuration:
           sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -124,6 +128,8 @@ configuration:
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050602 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
@@ -141,6 +147,8 @@ configuration:
           sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
+          sd: 000BB9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 1 # Slice/Service Type (uinteger, range: 0~255)
           sd: 050601 # Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
         - sst: 2 # Slice/Service Type (uinteger, range: 0~255)
@@ -245,6 +253,11 @@ configuration:
     maxAttempts: 2 # the maximum attempts of each sctp connection
     maxInitTimeout: 2 # the maximum init timeout of each sctp connection
   defaultUECtxReq: false # the default value of UE Context Request to decide when triggering Initial Context Setup procedure
+  # WNC: treat a FOR=0 Initial Registration as if Follow-On Request = 1, so the AMF keeps
+  # the N2/RRC connection after registration (instead of releasing immediately) and the UE
+  # can set up its default PDU session without looping. Bounded by the gNB RRC inactivity
+  # timer. Default false = stock behaviour.
+  treatInitialRegAsFollowOn: true
 
 logger: # log output setting
   enable: true # true or false
