@@ -226,6 +226,11 @@ dnnList:
       #sd: "000001"
   - dnn: V5GA01INTERNET # Data Network Name
     cidr: 10.125.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    ipv6:
+      prefix: 2001:db8:0125::/48
+      uePrefixLength: 64
+      allocation: random
+      raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
       sd: "000001"
@@ -271,6 +276,11 @@ dnnList:
       #sd: "000001"
   - dnn: vzwadmin # Data Network Name
     cidr: 10.126.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
+    ipv6:
+      prefix: 2001:db8:0126::/48
+      uePrefixLength: 64
+      allocation: random
+      raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
       sd: "000001"

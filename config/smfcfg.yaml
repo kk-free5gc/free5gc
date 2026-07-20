@@ -449,19 +449,57 @@ configuration:
                 staticPools:
                   - cidr: 10.124.100.0/24
               - dnn: V5GA01INTERNET
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4
+                    - IPV6
+                    - IPV4V6
                 pools:
                   - cidr: 10.125.0.0/16
                     exclude:
                       - "10.125.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.125.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0125::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0125::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0125:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: vzwadmin
+                pduSessionTypes:
+                  defaultSessionType: IPV4V6
+                  allowedSessionTypes:
+                    - IPV4
+                    - IPV6
+                    - IPV4V6
                 pools:
                   - cidr: 10.126.0.0/16
                     exclude:
                       - "10.126.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.126.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0126::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0126::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0126:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: wnctest
                 pools:
                   - cidr: 10.127.0.0/16
