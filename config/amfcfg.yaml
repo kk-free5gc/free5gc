@@ -258,6 +258,11 @@ configuration:
   # can set up its default PDU session without looping. Bounded by the gNB RRC inactivity
   # timer. Default false = stock behaviour.
   treatInitialRegAsFollowOn: true
+  # WNC: master switch for UE Policy (URSP) delivery to the UE via the DL NAS Transport
+  # "Manage UE Policy Command" after registration. Gates all delivery paths (PCF 3GPP flow,
+  # legacy TriggerUEPolicyDelivery, and PCF-notification SendUEPolicyToUE). Omit the field to
+  # keep the existing (enabled) behaviour; set to false to stop the AMF from sending it.
+  enableUEPolicy: true
 
 logger: # log output setting
   enable: true # true or false

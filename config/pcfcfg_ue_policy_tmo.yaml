@@ -1,0 +1,67 @@
+# Top-level key corresponding to the "UE policy section management list" Information Element (IE).
+# This IE is the mandatory payload of a "Manage UE Policy Command" message.
+# The dissector function is `de_nas_5gs_updp_ue_policy_section_mgm_lst`.
+#
+# This file currently reproduces a real T-Mobile US "Manage UE Policy Command" captured
+# via QXDM (see nw_usrp_policy_debug.xml). It is byte-for-byte verified against the raw
+# capture by TestBuildManageUEPolicyCommand_TMobile in NFs/amf/internal/policy.
+# Edit freely to change the policy that the AMF delivers to the UE.
+#
+# Supported traffic descriptor `type` values (see convertYAMLToInternalConfig):
+#   MatchAll | OSAppId (osId+osAppId) | DNN (value) | IPv4RemoteAddress (value "ip/mask")
+# Supported route selection component `type` values:
+#   S-NSSAI (value "SST-SD", SD hex) | DNN (value) | PDUSessionType (value, 1=IPv4 2=IPv6 3=IPv4v6) |
+#   PreferredAccessType (value "Non-3GPP" or other for 3GPP)
+policySectionManagementList:
+
+  # --- Sublist for PLMN 310260 (T-Mobile US) ---
+  # The PLMN ID is composed of MCC (Mobile Country Code) and MNC (Mobile Network Code).
+  - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+      mcc: "310" # Mobile Country Code (3 digits string, digit: 0~9)
+      mnc: "260" # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+
+    instructions:
+
+      # --- Instruction 1 ---
+      # UPSC: UE Policy Section Counter (sequence number for this update).
+      - upsc: 2001
+
+        policyParts:
+
+          # --- Policy Part 1: URSP ---
+          - type: URSP
+
+            urspRules:
+
+              # --- Rule 1: PRIORITIZE_LATENCY app -> slice EMBB0007D0 ---
+              - precedence: 1
+                trafficDescriptor:
+                  # OS Id + OS App Id type (3GPP TS 24.526 traffic descriptor component 0x08)
+                  - type: OSAppId
+                    osId: "97a498e3-fc92-5c94-8986-0333d06e4e47"
+                    osAppId: "PRIORITIZE_LATENCY"
+                routeSelectionDescriptors:
+                  - precedence: 1
+                    components:
+                      - type: S-NSSAI
+                        value: "1-0007D0" # SST=1, SD=0x0007D0 (shown as EMBB0007D0)
+                      - type: DNN
+                        value: "fast.t-mobile.com"
+                      - type: PDUSessionType
+                        value: "2" # IPv6
+
+              # --- Rule 2: PRIORITIZE_BANDWIDTH app -> slice EMBB000BB8 ---
+              - precedence: 2
+                trafficDescriptor:
+                  - type: OSAppId
+                    osId: "97a498e3-fc92-5c94-8986-0333d06e4e47"
+                    osAppId: "PRIORITIZE_BANDWIDTH"
+                routeSelectionDescriptors:
+                  - precedence: 1
+                    components:
+                      - type: S-NSSAI
+                        value: "1-000BB8" # SST=1, SD=0x000BB8 (shown as EMBB000BB8)
+                      - type: DNN
+                        value: "fast.t-mobile.com"
+                      - type: PDUSessionType
+                        value: "2" # IPv6
