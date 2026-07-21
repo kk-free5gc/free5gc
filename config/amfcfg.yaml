@@ -263,6 +263,13 @@ configuration:
   # legacy TriggerUEPolicyDelivery, and PCF-notification SendUEPolicyToUE). Omit the field to
   # keep the existing (enabled) behaviour; set to false to stop the AMF from sending it.
   enableUEPolicy: true
+  # [WNC] Selects how the Registration Accept "Allowed NSSAI" IE is populated when the UE
+  # sends no (matching) Requested NSSAI:
+  #   default             - stock: advertise only the default-indicated subscribed slice
+  #   allSubscribedNoReq  - advertise ALL subscribed slices this AMF supports (all SIM slices)
+  #   allSubscribedAlways - reserved for future use; currently same as allSubscribedNoReq
+  # Omit the field for stock (default) behaviour.
+  allowedNssaiMode: allSubscribedAlways
 
 logger: # log output setting
   enable: true # true or false
