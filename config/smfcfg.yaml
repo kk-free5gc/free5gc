@@ -93,7 +93,7 @@ configuration:
             ipv6: 2001:4860:4860::8888
     - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        sd: 0007d0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
       dnnInfos: # DNN information list
         - dnn: fast.t-mobile.com # Data Network Name
           dns: # the IP address of DNS
@@ -125,7 +125,7 @@ configuration:
             ipv6: 2001:4860:4860::8888
     - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        sd: 000bb8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
       dnnInfos: # DNN information list
         - dnn: fast.t-mobile.com # Data Network Name
           dns: # the IP address of DNS
@@ -157,7 +157,7 @@ configuration:
             ipv6: 2001:4860:4860::8888
     - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
         sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-        sd: 000BB9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+        sd: 000bb9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
       dnnInfos: # DNN information list
         - dnn: fast.t-mobile.com # Data Network Name
           dns: # the IP address of DNS
@@ -509,7 +509,7 @@ configuration:
                   - cidr: 10.127.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
               sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-              sd: 0007D0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+              sd: 0007d0 # 2000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             dnnUpfInfoList: # DNN information list for this S-NSSAI
               - dnn: fast.t-mobile.com
                 pduSessionTypes:
@@ -581,7 +581,7 @@ configuration:
                   - cidr: 10.137.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
               sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-              sd: 000BB8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+              sd: 000bb8 # 3000, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             dnnUpfInfoList: # DNN information list for this S-NSSAI
               - dnn: fast.t-mobile.com
                 pduSessionTypes:
@@ -653,7 +653,7 @@ configuration:
                   - cidr: 10.147.100.0/24
           - sNssai: # S-NSSAI (Single Network Slice Selection Assistance Information)
               sst: 1 # Slice/Service Type (uinteger, range: 0~255)
-              sd: 000BB9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
+              sd: 000bb9 # 3001, Slice Differentiator (3 bytes hex string, range: 000000~FFFFFF)
             dnnUpfInfoList: # DNN information list for this S-NSSAI
               - dnn: fast.t-mobile.com
                 pduSessionTypes:

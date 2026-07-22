@@ -33,7 +33,7 @@ policySectionManagementList:
 
             urspRules:
 
-              # --- Rule 1: PRIORITIZE_LATENCY app -> slice EMBB0007D0 ---
+              # --- Rule 1: PRIORITIZE_LATENCY app -> slice EMBB0007d0 ---
               - precedence: 1
                 trafficDescriptor:
                   # OS Id + OS App Id type (3GPP TS 24.526 traffic descriptor component 0x08)
@@ -44,13 +44,13 @@ policySectionManagementList:
                   - precedence: 1
                     components:
                       - type: S-NSSAI
-                        value: "1-0007D0" # SST=1, SD=0x0007D0 (shown as EMBB0007D0)
+                        value: "1-0007d0" # SST=1, SD=0x0007d0 (shown as EMBB0007d0)
                       - type: DNN
                         value: "fast.t-mobile.com"
                       - type: PDUSessionType
-                        value: "2" # IPv6
+                        value: "3" # 2: IPv6; 3: IPv4v6
 
-              # --- Rule 2: PRIORITIZE_BANDWIDTH app -> slice EMBB000BB8 ---
+              # --- Rule 2: PRIORITIZE_BANDWIDTH app -> slice EMBB000bb8 ---
               - precedence: 2
                 trafficDescriptor:
                   - type: OSAppId
@@ -60,8 +60,8 @@ policySectionManagementList:
                   - precedence: 1
                     components:
                       - type: S-NSSAI
-                        value: "1-000BB8" # SST=1, SD=0x000BB8 (shown as EMBB000BB8)
+                        value: "1-000bb8" # SST=1, SD=0x000bb8 (shown as EMBB000bb8)
                       - type: DNN
                         value: "fast.t-mobile.com"
                       - type: PDUSessionType
-                        value: "2" # IPv6
+                        value: "3" # 2: IPv6; 3: IPv4v6

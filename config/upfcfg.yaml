@@ -53,7 +53,7 @@ dnnList:
       raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "0007D0"
+      sd: "0007d0"
   - dnn: fast.t-mobile.com # Data Network Name
     cidr: 10.141.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     ipv6:
@@ -63,7 +63,7 @@ dnnList:
       raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB8"
+      sd: "000bb8"
   - dnn: fast.t-mobile.com # Data Network Name
     cidr: 10.151.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     ipv6:
@@ -73,7 +73,7 @@ dnnList:
       raProfile: default
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB9"
+      sd: "000bb9"
   - dnn: fast.t-mobile.com # Data Network Name
     cidr: 10.161.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
@@ -108,17 +108,17 @@ dnnList:
     cidr: 10.132.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "0007D0"
+      sd: "0007d0"
   - dnn: internet # Data Network Name
     cidr: 10.142.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB8"
+      sd: "000bb8"
   - dnn: internet # Data Network Name
     cidr: 10.152.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB9"
+      sd: "000bb9"
   - dnn: internet # Data Network Name
     cidr: 10.162.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
@@ -148,17 +148,17 @@ dnnList:
     cidr: 10.133.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "0007D0"
+      sd: "0007d0"
   - dnn: ims # Data Network Name
     cidr: 10.143.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB8"
+      sd: "000bb8"
   - dnn: ims # Data Network Name
     cidr: 10.153.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB9"
+      sd: "000bb9"
   - dnn: ims # Data Network Name
     cidr: 10.163.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     ipv6:
@@ -193,17 +193,17 @@ dnnList:
     cidr: 10.134.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "0007D0"
+      sd: "0007d0"
   - dnn: sos # Data Network Name
     cidr: 10.144.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB8"
+      sd: "000bb8"
   - dnn: sos # Data Network Name
     cidr: 10.154.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB9"
+      sd: "000bb9"
   - dnn: sos # Data Network Name
     cidr: 10.164.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
@@ -238,17 +238,17 @@ dnnList:
     cidr: 10.135.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "0007D0"
+      sd: "0007d0"
   - dnn: V5GA01INTERNET # Data Network Name
     cidr: 10.145.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB8"
+      sd: "000bb8"
   - dnn: V5GA01INTERNET # Data Network Name
     cidr: 10.155.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB9"
+      sd: "000bb9"
   - dnn: V5GA01INTERNET # Data Network Name
     cidr: 10.165.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     ipv6:
@@ -288,17 +288,17 @@ dnnList:
     cidr: 10.136.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "0007D0"
+      sd: "0007d0"
   - dnn: vzwadmin # Data Network Name
     cidr: 10.146.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB8"
+      sd: "000bb8"
   - dnn: vzwadmin # Data Network Name
     cidr: 10.156.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB9"
+      sd: "000bb9"
   - dnn: vzwadmin # Data Network Name
     cidr: 10.166.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     ipv6:
@@ -333,17 +333,17 @@ dnnList:
     cidr: 10.137.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "0007D0"
+      sd: "0007d0"
   - dnn: wnctest # Data Network Name
     cidr: 10.147.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB8"
+      sd: "000bb8"
   - dnn: wnctest # Data Network Name
     cidr: 10.157.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
       sst: 1
-      sd: "000BB9"
+      sd: "000bb9"
   - dnn: wnctest # Data Network Name
     cidr: 10.167.0.0/16 # Classless Inter-Domain Routing for assigned IPv4 pool of UE
     snssai:              # OPTIONAL - only for logging, not routing logic
