@@ -1,0 +1,64 @@
+# Top-level key corresponding to the "UE policy section management list" Information Element (IE).
+# This IE is the mandatory payload of a "Manage UE Policy Command" message.
+# The dissector function is `de_nas_5gs_updp_ue_policy_section_mgm_lst`.
+#
+# VARIANT: DELETE. This file removes UE policy sections from the UE instead of installing
+# them. Each instruction names a UPSC and carries NO policy parts. A UE that already
+# stores that UPSI (PLMN ID + UPSC) deletes the stored section when it receives an
+# instruction with an empty UE policy section. That is the method MediaTek's support
+# answer describes, and the comment in pcfcfg_ue_policy_tmo.yaml states the same rule:
+#   "sending a UPSC with empty contents deletes it".
+#
+# Sections deleted, PLMN 310260 (T-Mobile US):
+#   - UPSC 3001: the T-Mobile policy in pcfcfg_ue_policy_tmo.yaml. On 2026-10-08 the UE
+#     reported this UPSC in its UE STATE INDICATION as "UPSC: 0x0bb9".
+#   - UPSC 2001: requested by the user. The UE did not report this UPSC on 2026-10-08, so
+#     this instruction is expected to delete nothing. MediaTek's answer says the UE deletes
+#     only when the UPSI already exists.
+#
+# ENCODING: convertYAMLToInternalConfig and buildInstruction (AMF and PCF copies of
+# internal/policy/ue_policy.go) encode an instruction with an empty policyParts list as the
+# 2-byte UPSC only, with instruction length 0x0002 and no UE policy part. This file encodes to
+#   80 01 000d 000b 130062 0002 07d1 0002 0bb9
+# which TestBuildManageUEPolicyCommand_TMobileDelete checks in both packages.
+#
+# ACTIVATE (the AMF and PCF load ./config/pcfcfg_ue_policy_wnc.yaml, per the comment in
+# pcfcfg_ue_policy_00101.yaml):
+#   ln -sfn pcfcfg_ue_policy_tmo_del.yaml config/pcfcfg_ue_policy_wnc.yaml
+# then restart the NFs that load it, and make the UE register again (AT+CFUN=0, AT+CFUN=1).
+#
+# VERIFY, in this order:
+#   1. Air trace: a DL NAS TRANSPORT with payload container type "UE policy container"
+#      carrying MANAGE UE POLICY COMMAND. In the command's UE policy section management
+#      list, each instruction should hold only its 2-octet UPSC and no UE policy section
+#      contents.
+#   2. Air trace: the UE answers MANAGE UE POLICY COMPLETE (or MANAGE UE POLICY COMMAND
+#      REJECT, whose cause says why).
+#   3. On the UE: `mipc_wan_cli --ursp_ue_policy_get 310260` returns no rules.
+#   4. At the next registration, the UE STATE INDICATION no longer lists "UPSC: 0x0bb9".
+#   5. Modem log filtered on "ursp": a line that resets or deletes the UPSC 3001 section.
+#
+# RESTORE the normal T-Mobile policy afterwards:
+#   ln -sfn pcfcfg_ue_policy_tmo.yaml config/pcfcfg_ue_policy_wnc.yaml
+#
+# NOTE: convertYAMLToInternalConfig() uses PolicySectionManagementList[0] only -- there is
+# no per-UE PLMN matching. Keep exactly one plmnId sublist per variant file.
+policySectionManagementList:
+
+  # --- Sublist for PLMN 310260 (T-Mobile US) ---
+  # The PLMN ID is composed of MCC (Mobile Country Code) and MNC (Mobile Network Code).
+  - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+      mcc: "310" # Mobile Country Code (3 digits string, digit: 0~9)
+      mnc: "260" # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+
+    instructions:
+
+      # --- Instruction 1: delete UPSC 2001 ---
+      # Empty policyParts = empty UE policy section = delete the stored section, if any.
+      - upsc: 2001
+        policyParts: []
+
+      # --- Instruction 2: delete UPSC 3001 (the T-Mobile URSP rules) ---
+      # Empty policyParts = empty UE policy section = delete the stored section.
+      - upsc: 3001
+        policyParts: []

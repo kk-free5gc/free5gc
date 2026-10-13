@@ -258,6 +258,80 @@ configuration:
   # can set up its default PDU session without looping. Bounded by the gNB RRC inactivity
   # timer. Default false = stock behaviour.
   treatInitialRegAsFollowOn: true
+  # WNC: useNasIdentityIfNgapSTmsiMissing selects where the AMF reads the UE's 5G-S-TMSI for a
+  # Service Request. The gNB forwards a Service Request to the AMF inside an NGAP
+  # InitialUEMessage. That one NGAP message can hold the 5G-S-TMSI in two different IEs:
+  #
+  #   | IE                                   | Layer | Filled by | Value comes from                    |
+  #   |--------------------------------------|-------|-----------|-------------------------------------|
+  #   | NGAP IE "5G-S-TMSI" (IE id 26)       | NGAP  | gNB (CU)  | ng-5G-S-TMSI-Part1 + Part2 that the |
+  #   |                                      |       |           | UE sends in RRCSetupRequest and     |
+  #   |                                      |       |           | RRCSetupComplete                    |
+  #   | NAS IE "5GS mobile identity" in the  | NAS   | UE        | The UE's NAS layer. TS 24.501       |
+  #   | Service Request, carried inside NGAP |       |           | requires this IE in every Service   |
+  #   | IE "NAS-PDU"                         |       |           | Request                             |
+  #
+  # When the UE sends randomValue instead of ng-5G-S-TMSI-Part1 in RRCSetupRequest, the gNB
+  # has no 5G-S-TMSI to copy, so the NGAP IE "5G-S-TMSI" is missing. The NAS IE "5GS mobile
+  # identity" is still present in that case. The MTK UE always sends randomValue
+  # (CU log: nr-rrc.ue_Identity == 1).
+  #
+  # This flag is a fallback only. When the NGAP IE "5G-S-TMSI" is present, the AMF always uses
+  # it, whatever the value of this flag.
+  #
+  #   | Value           | AMF behaviour for a Service Request without NGAP IE "5G-S-TMSI"   |
+  #   |-----------------|-------------------------------------------------------------------|
+  #   | false (default) | Stock: send ErrorIndication, then UEContextReleaseCommand with    |
+  #   |                 | cause Protocol=unspecified. The UE retries and is released again. |
+  #   | true            | Read the 5G-S-TMSI from NAS IE "5GS mobile identity", and use it  |
+  #   |                 | to find the stored UE context.                                    |
+  useNasIdentityIfNgapSTmsiMissing: true
+  # WNC: preferSubscribedDefaultInAllowedNssai selects how the AMF picks the S-NSSAI for a PDU
+  # Session Establishment Request that carries no S-NSSAI IE. The AMF always picks from the
+  # Allowed NSSAI. Three different slice lists are involved:
+  #
+  #   | List                   | Meaning                                  | Source                         |
+  #   |------------------------|------------------------------------------|--------------------------------|
+  #   | Subscribed S-NSSAIs    | Every slice the UE is entitled to use    | MongoDB subscriptionData.      |
+  #   |                        |                                          | provisionedData.amData → nssai |
+  #   | Default S-NSSAIs       | Subscribed S-NSSAIs that the operator    | Same document, array           |
+  #   |                        | marks as default in the webconsole       | nssai.defaultSingleNssais      |
+  #   | Allowed NSSAI          | Slices the AMF allows in this            | AMF, at registration; keeps    |
+  #   |                        | registration                             | the Requested NSSAI order      |
+  #
+  # TS 23.502 V19.9.0 clause 4.3.2.2.1 step 2 defines this order:
+  #
+  #   | Index | Condition                                           | S-NSSAI picked                  |
+  #   |-------|-----------------------------------------------------|---------------------------------|
+  #   | 1     | The Allowed NSSAI has exactly one S-NSSAI           | That S-NSSAI                    |
+  #   | 2     | Exactly one Default S-NSSAI exists, and that        | That Default S-NSSAI            |
+  #   |       | S-NSSAI is in the Allowed NSSAI                     |                                 |
+  #   | 3     | Otherwise                                           | Operator policy. In this AMF:   |
+  #   |       |                                                     | the first S-NSSAI in the        |
+  #   |       |                                                     | Allowed NSSAI                   |
+  #
+  # None of these conditions looks at the DNN.
+  #
+  #   | Value           | Indexes used    | Matches TS 23.502 clause 4.3.2.2.1?                   |
+  #   |-----------------|-----------------|-------------------------------------------------------|
+  #   | false (default) | 1, 3            | No: skips index 2. Stock free5gc behaviour: always    |
+  #   |                 |                 | the first S-NSSAI in the Allowed NSSAI                |
+  #   | true            | 1, 2, 3 in order| Yes                                                   |
+  #
+  # Example: Allowed NSSAI 1/0007D0, 1/000BB8, 1/000001, 1/000BB9, and 1/000001 is the only
+  # Default S-NSSAI. false picks 1/0007D0 (SD 2000). true picks 1/000001.
+  #
+  # The requested DNN must be listed for the picked S-NSSAI in both MongoDB collections below,
+  # or the PDU session fails:
+  #
+  #   | Collection                              | Read by           | If the DNN is missing     |
+  #   |-----------------------------------------|-------------------|---------------------------|
+  #   | subscriptionData.provisionedData.smData | SMF (through UDM) | SMF warns, uses smfcfg    |
+  #   | policyData.ues.smData                   | PCF (through UDR) | UDR 404, PCF rejects      |
+  #
+  # For every request without S-NSSAI IE, the AMF logs "[WNC] PDU Session Establishment Request
+  # without S-NSSAI IE" with the picked S-NSSAI and the index of the condition that picked it.
+  preferSubscribedDefaultInAllowedNssai: true
   # WNC: master switch for UE Policy (URSP) delivery to the UE via the DL NAS Transport
   # "Manage UE Policy Command" after registration. Gates all delivery paths (PCF 3GPP flow,
   # legacy TriggerUEPolicyDelivery, and PCF-notification SendUEPolicyToUE). Omit the field to

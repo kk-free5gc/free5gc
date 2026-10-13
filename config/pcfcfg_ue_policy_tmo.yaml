@@ -23,8 +23,12 @@ policySectionManagementList:
     instructions:
 
       # --- Instruction 1 ---
-      # UPSC: UE Policy Section Counter (sequence number for this update).
-      - upsc: 2001
+      # UPSC: UE Policy Section Code (TS 24.526 §5.2) -- a 2-octet identifier for this
+      # policy section, NOT a sequence number. PLMN ID + UPSC = UPSI, which the UE
+      # stores and reports back so the PCF knows which sections it already holds.
+      # Reusing the same UPSC replaces the section's contents; a new UPSC adds a new
+      # section; sending a UPSC with empty contents deletes it. Valid: 0x0001-0xFFFF.
+      - upsc: 3001
 
         policyParts:
 
@@ -49,7 +53,6 @@ policySectionManagementList:
                         value: "fast.t-mobile.com"
                       - type: PDUSessionType
                         value: "3" # 2: IPv6; 3: IPv4v6
-
               # --- Rule 2: PRIORITIZE_BANDWIDTH app -> slice EMBB000bb8 ---
               - precedence: 2
                 trafficDescriptor:
@@ -61,6 +64,21 @@ policySectionManagementList:
                     components:
                       - type: S-NSSAI
                         value: "1-000bb8" # SST=1, SD=0x000bb8 (shown as EMBB000bb8)
+                      - type: DNN
+                        value: "fast.t-mobile.com"
+                      - type: PDUSessionType
+                        value: "3" # 2: IPv6; 3: IPv4v6
+              # --- Rule 3: PRIORITIZE_GAMING app -> slice EMBB000bb9 ---
+              - precedence: 3
+                trafficDescriptor:
+                  - type: OSAppId
+                    osId: "97a498e3-fc92-5c94-8986-0333d06e4e47"
+                    osAppId: "PRIORITIZE_GAMING"
+                routeSelectionDescriptors:
+                  - precedence: 1
+                    components:
+                      - type: S-NSSAI
+                        value: "1-000bb9" # SST=1, SD=0x000bb9 (shown as EMBB000bb9)
                       - type: DNN
                         value: "fast.t-mobile.com"
                       - type: PDUSessionType

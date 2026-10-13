@@ -408,6 +408,19 @@ configuration:
                       - "10.121.0.1"  # WNC: reserve IPv4 gateway (never allocated to a UE)
                 staticPools:
                   - cidr: 10.121.100.0/24
+                ipv6Pools:
+                  - prefix: 2001:db8:0121::/48
+                    uePrefixLength: 64
+                    iidAllocation: random
+                    raProfile: default
+                    exclude:
+                      - "2001:db8:0121::1"  # WNC: reserve IPv6 gateway; keeps fe80::1 free for the router source LL
+                ipv6StaticPools:
+                  - prefix: 2001:db8:0121:100::/64
+                    uePrefixLength: 64
+                    iidAllocation: manual
+                    raProfile: default
+                routerSolicitationMonitor: true  # WNC: Enable Router Solicitation monitoring for this DNN
               - dnn: internet
                 pduSessionTypes:
                   defaultSessionType: IPV4V6

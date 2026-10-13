@@ -1,0 +1,97 @@
+# Top-level key corresponding to the "UE policy section management list" Information Element (IE).
+# This IE is the mandatory payload of a "Manage UE Policy Command" message.
+# The dissector function is `de_nas_5gs_updp_ue_policy_section_mgm_lst`.
+#
+# VARIANT: PLMN 00101 (MCC=001, MNC=01) test network.
+# This is a straight port of pcfcfg_ue_policy_tmo.yaml (the byte-for-byte T-Mobile US
+# capture) with the PLMN ID swapped to 001/01 for the test SIM range
+# IMSI 001010000010548. The URSP rules themselves are unchanged.
+#
+# Activate by pointing the symlink the NFs actually load at this file:
+#   ln -sfn pcfcfg_ue_policy_00101.yaml config/pcfcfg_ue_policy_wnc.yaml
+# (both AMF gmm/handler.go:822 and PCF processor/uepolicy.go:507 hardcode the
+#  ./config/pcfcfg_ue_policy_wnc.yaml path)
+#
+# NOTE: convertYAMLToInternalConfig() uses PolicySectionManagementList[0] only --
+# there is no per-UE PLMN matching. Keep exactly one plmnId sublist per variant file.
+#
+# Supported traffic descriptor `type` values (see convertYAMLToInternalConfig):
+#   MatchAll | OSAppId (osId+osAppId) | DNN (value) | IPv4RemoteAddress (value "ip/mask")
+# Supported route selection component `type` values:
+#   S-NSSAI (value "SST-SD", SD hex) | DNN (value) | PDUSessionType (value, 1=IPv4 2=IPv6 3=IPv4v6) |
+#   PreferredAccessType (value "Non-3GPP" or other for 3GPP)
+policySectionManagementList:
+
+  # --- Sublist for PLMN 00101 (test network / new SIM) ---
+  # The PLMN ID is composed of MCC (Mobile Country Code) and MNC (Mobile Network Code).
+  # Encodes to NAS bytes 00 F1 10 (2-digit MNC -> 0xF filler nibble).
+  - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+      mcc: "001" # Mobile Country Code (3 digits string, digit: 0~9)
+      mnc: "01"  # Mobile Network Code (2 or 3 digits string, digit: 0~9)
+
+    instructions:
+
+      # --- Instruction 1 ---
+      # UPSC: UE Policy Section Code (TS 24.526 §5.2) -- a 2-octet identifier for this
+      # policy section, NOT a sequence number. PLMN ID + UPSC = UPSI, which the UE
+      # stores and reports back so the PCF knows which sections it already holds.
+      # Reusing the same UPSC replaces the section's contents; a new UPSC adds a new
+      # section; sending a UPSC with empty contents deletes it. Valid: 0x0001-0xFFFF.
+      - upsc: 3001
+
+        policyParts:
+
+          # --- Policy Part 1: URSP ---
+          - type: URSP
+
+            urspRules:
+
+              # --- Rule 1: PRIORITIZE_LATENCY app -> slice EMBB0007d0 ---
+              - precedence: 1
+                trafficDescriptor:
+                  # OS Id + OS App Id type (3GPP TS 24.526 traffic descriptor component 0x08)
+                  - type: OSAppId
+                    osId: "97a498e3-fc92-5c94-8986-0333d06e4e47"
+                    osAppId: "PRIORITIZE_LATENCY"
+                routeSelectionDescriptors:
+                  - precedence: 1
+                    components:
+                      - type: S-NSSAI
+                        value: "1-0007d0" # SST=1, SD=0x0007d0 (shown as EMBB0007d0)
+                      - type: DNN
+                        value: "fast.t-mobile.com"
+                      - type: PDUSessionType
+                        # IPv4v6, not IPv6-only: an IPv6-only PDU session on this build gets
+                        # released by the UE ~12s in (5GSM cause #36) while the IPv6 data
+                        # plane issue is open. Keep "3" until that is fixed.
+                        value: "3" # 2: IPv6; 3: IPv4v6
+              # --- Rule 2: PRIORITIZE_BANDWIDTH app -> slice EMBB000bb8 ---
+              - precedence: 2
+                trafficDescriptor:
+                  - type: OSAppId
+                    osId: "97a498e3-fc92-5c94-8986-0333d06e4e47"
+                    osAppId: "PRIORITIZE_BANDWIDTH"
+                routeSelectionDescriptors:
+                  - precedence: 1
+                    components:
+                      - type: S-NSSAI
+                        value: "1-000bb8" # SST=1, SD=0x000bb8 (shown as EMBB000bb8)
+                      - type: DNN
+                        value: "fast.t-mobile.com"
+                      - type: PDUSessionType
+                        value: "3" # 2: IPv6; 3: IPv4v6
+              # --- Rule 3: PRIORITIZE_GAMING app -> slice EMBB000bb9 ---
+              - precedence: 3
+                trafficDescriptor:
+                  - type: OSAppId
+                    osId: "97a498e3-fc92-5c94-8986-0333d06e4e47"
+                    osAppId: "PRIORITIZE_GAMING"
+                routeSelectionDescriptors:
+                  - precedence: 1
+                    components:
+                      - type: S-NSSAI
+                        value: "1-000bb9" # SST=1, SD=0x000bb9 (shown as EMBB000bb9)
+                      - type: DNN
+                        value: "fast.t-mobile.com"
+                      - type: PDUSessionType
+                        value: "3" # 2: IPv6; 3: IPv4v6
