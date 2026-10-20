@@ -22,6 +22,8 @@ log/
 *.log
 *.pcap
 config/test/smfcfg.test.yaml
+.specstory
+*.tar.gz
 
 # build
 bin/
