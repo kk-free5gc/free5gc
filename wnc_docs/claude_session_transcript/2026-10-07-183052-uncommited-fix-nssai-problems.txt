@@ -1,0 +1,2508 @@
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc
+
+
+❯ I have a problem, my CN does not send Registration Accept back to CU          
+  (192.168.0.184) after got "Security Mode Complete" message from CU.           
+                                                                                
+  Here is log:                                                                  
+                                                                                
+  /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_logs/te 
+  st2-cn-not-send-reg-accept-after-security-command/free5gc                     
+                                                                                
+  In /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_logs 
+  /test2-cn-not-send-reg-accept-after-security-command/free5gc/log/20261007_131 
+  432/free5gc.pcap                                                              
+                                                                                
+  There should be                                                               
+                                                                                
+  1156    13:15:51.055034    192.168.0.184    192.168.0.2                       
+  NGAP/NAS-5GS/NAS-5GS    224    UplinkNASTransport, Security mode complete,    
+  Registration request                                                          
+                                                                                
+  // Missing                                                                    
+  192.168.0.2    192.168.0.184    NGAP/NAS-5GS    252                           
+  InitialContextSetupRequest, Registration accept                               
+                                                                                
+  1406    13:15:55.580039    192.168.0.184    192.168.0.2    NGAP    96         
+  UEContextReleaseRequest [Cause:                                               
+  RadioNetwork=release-due-to-ngran-generated-reason]                           
+                                                                                
+  Tell me what went wrong                                                       
+
+● I'll use the systematic-debugging skill, because this is a "why did X not
+  happen" investigation.
+
+● Skill(superpowers:systematic-debugging)
+  ⎿  Successfully loaded skill
+
+● Phase 1 is to read the evidence. This command lists the files in the log
+  directory, so I can see which logs are available.
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_
+      logs/test2-cn-not-send-reg-accept-after-security-command/free5gc && find .
+      -type f | he…)
+  ⎿  ./config/chfcfg.yaml
+     ./config/n3iwfcfg.test.yaml
+     ./config/pcfcfg_ue_policy_00101.yaml
+     … +50 lines (ctrl+o to expand)
+
+● This command prints the AMF log lines between 13:15:50 and 13:15:56, which is
+  the window around the Security Mode Complete (frame 1156) and the
+  UEContextReleaseRequest (frame 1406).
+
+● Bash(cd log/20261007_131432 && grep -nE "2026-10-07T13:15:5[0-6]" free5gc.log
+      | grep -vE "\[(NRF|UDR|NSSF|CHF|NEF)\]" | cut -c1-400 | head -150)
+  ⎿  1091:time="2026-10-07T13:15:50.635240126+08:00" level="trace" msg="Rea
+     d 74 bytes" CAT="Ngap" NF="AMF"
+     1092:time="2026-10-07T13:15:50.635349133+08:00" level="trace" msg="Pac
+     … +358 lines (ctrl+o to expand)
+
+● The window is too noisy. This command shows only AMF log lines from the moment
+  the Security Mode Complete arrives (13:15:51.05) until 13:15:56, without the
+  trace-level hex dumps.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(sed -n '1342,1411p' free5gc.log | grep -vE
+      'level="trace"|CAT="Token"|oauth2|AuthorizationCheck' | cut -c1-900)
+  ⎿  time="2026-10-07T13:15:51.057437134+08:00" level="info" msg="Handle In
+     itialRegistration" CAT="Gmm" NF="AMF" amf_ue_ngap_id="RU:65538,AU:2(3G
+     PP)" supi="SUPI:imsi-310260000013069"
+     … +58 lines (ctrl+o to expand)
+
+● The chain is visible now. Next I read the AMF code that turns the NSSF answer
+  into the reroute decision. This command searches the AMF source for the two
+  error strings.
+
+● Bash(cd
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/amf
+      && grep -rn "Registration Status Update Error\|can not select an target
+      AMF by NRF…)
+  ⎿  internal/gmm/handler.go:673:                       ue.GmmLog.Errorf("Regist
+     te Error[%+v]", err)
+     internal/gmm/handler.go:1169:func handleRequestedNssai(ue *context.Amf
+     … +13 lines (ctrl+o to expand)
+
+
+● This reads handleRequestedNssai in the AMF GMM (5G Mobility Management)
+  handler, which is the function that decided to reroute.
+
+  Read 1 file (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc &&
+      grep -n "handleRequestedNssai\|allowedNssaiMode\|AllowedNssaiMode" -r
+      NFs/amf/internal…)
+  ⎿  NFs/amf/internal/gmm/handler.go:641:       if err :=
+     handleRequestedNssai(ue,
+      anType); err != nil {
+     NFs/amf/internal/gmm/handler.go:857:       if err :=
+     handleRequestedNssai(ue,
+     … +30 lines (ctrl+o to expand)
+
+  Read 2 files (ctrl+o to expand)
+
+● Bash(cd my_logs/test2-cn-not-send-reg-accept-after-security-command/free5gc &&
+      awk '/plmnSupportList:/,/supportDnnList:/' config/amfcfg.yaml | grep -vE
+      '^\s*#' ; ech…)
+  ⎿    plmnSupportList:
+         - plmnId: # Public Land Mobile Network ID, <PLMN ID> = <MCC><MNC>
+             mcc: 466 # Mobile Country Code (3 digits string, digit: 0~9)
+     … +92 lines (ctrl+o to expand)
+
+● What went wrong
+
+  The AMF received Security Mode Complete and started building the Registration
+  Accept. It stopped during the network slice check, decided that a different
+  AMF must serve the UE, could not find one, and then sent nothing to the CU.
+  The CU waited about 4.5 seconds and sent UEContextReleaseRequest.
+
+  Root cause: the UE asks for slices that its subscription does not contain
+
+  The Registration Request from imsi-310260000013069 carries this Requested
+  NSSAI (the list of network slices the UE asks for). I decoded it from log line
+  1375:
+
+  ┌────────────────────────────────────────────────┬────────────────────────┐
+  │     Requested S-NSSAI (slice type / slice      │      In the UE's       │
+  │                differentiator)                 │     subscription?      │
+  ├────────────────────────────────────────────────┼────────────────────────┤
+  │ SST 1 / SD 050601                              │ No                     │
+  ├────────────────────────────────────────────────┼────────────────────────┤
+  │ SST 2 / SD 050602                              │ No                     │
+  ├────────────────────────────────────────────────┼────────────────────────┤
+  │ SST 3 / SD 050603                              │ No                     │
+  ├────────────────────────────────────────────────┼────────────────────────┤
+  │ SST 3 / SD 050503                              │ No                     │
+  ├────────────────────────────────────────────────┼────────────────────────┤
+  │ SST 1 / SD 0007D0                              │ Yes                    │
+  ├────────────────────────────────────────────────┼────────────────────────┤
+  │ SST 1 / SD 000BB8                              │ Yes                    │
+  └────────────────────────────────────────────────┴────────────────────────┘
+
+  The UDM returns four subscribed slices for this SUPI: 1/000001 (marked as
+  default), 1/0007D0, 1/000BB8 and 1/000BB9. You can see them in the NSSF query
+  on log line 1397.
+
+  How the AMF reacts, step by step (NFs/amf/internal/gmm/handler.go)
+
+  1. Line 1183: handleRequestedNssai checks the first requested slice, 1/050601.
+     That slice is not in ue.SubscribedNssai, so the function sets
+     needSliceSelection = true and leaves the loop with break. The function
+     never looks at the remaining requested slices, so ue.AllowedNssai stays
+     empty.
+  2. Line 1227: The AMF asks the NSSF for slice selection. The NSSF logs No TA 
+     {310/260, tac 000001} in NSSF configuration and returns 200 without any
+     target AMF set.
+  3. Line 1242: The AMF calls RegistrationStatusUpdate toward the "old AMF". The
+     UE's old 5G-GUTI points at AMF ID 800101 in PLMN 001/01, which does not
+     exist here, so the log shows Registration Status Update Error[amf not 
+     found].
+  4. Line 1278: The AMF asks the NRF for another AMF.
+     SearchAmfCommunicationInstance (nrf_service.go:165) skips its own instance
+     and finds no other AMF, so the log shows AMF can not select an target AMF 
+     by NRF.
+  5. Line 1322: As the last option, the AMF tries to send an NGAP
+     RerouteNASRequest to the CU. The AllowedNSSAI information element in that
+     message must hold at least one slice. Step 1 left the list empty, so ASN.1
+     encoding fails with Build RerouteNasRequest failed : SEQUENCE OF Size is 
+     lower than lowerbound.
+  6. Line 1323 → line 641: handleRequestedNssai returns the error to
+     HandleInitialRegistration. That function returns immediately, and the GMM
+     state machine moves ContextSetup → Deregistered. No Registration Reject is 
+     sent on this path. The CU therefore gets no answer at all.
+
+  Your allowedNssaiMode: allSubscribedAlways code at lines 1331–1372 never runs
+  here. The function returns at line 1323, before it reaches that code.
+
+  All four registration attempts in this log fail the same way (log lines 1011,
+  1375, 2044 and 2409). The UE sends the identical Requested NSSAI every time,
+  and the log contains no Send Registration Accept at all.
+
+  ★ Insight ─────────────────────────────────────
+  - Stock free5gc treats "a requested slice is not subscribed" as a reason for
+    AMF re-allocation (TS 23.502 §4.2.2.2.3). It does not simply put that slice
+    into the Rejected NSSAI. In a single-AMF lab, re-allocation can never
+    succeed.
+  - The break at line 1196 means a single unsubscribed slice at the front of the
+    list stops the check of every later slice. Here that left AllowedNssai
+    empty. The same list in a different order would still trigger re-allocation,
+    but the reroute message would at least encode.
+  - The silent failure is a separate defect. When re-allocation is impossible,
+    TS 24.501 expects the AMF to answer the UE, either with a Registration
+    Accept that carries a Rejected NSSAI or with a Registration Reject. The AMF
+    should not drop the procedure without a reply.
+    ─────────────────────────────────────────────────
+
+  Ways to fix it (I have not changed anything)
+
+  - Subscriber data (no code change): In the webconsole, add 1/050601, 2/050602,
+    3/050603 and 3/050503 to the subscription for imsi-310260000013069. Then
+    every requested slice is subscribed, and the AMF does not try re-allocation.
+    Note that 3/050503 is also missing from the AMF plmnSupportList, so you
+    would need to add it there too.
+  - UE side: Configure the UE so that it requests only the slices it is
+    subscribed to.
+  - AMF code: Change handleRequestedNssai so that it puts unsubscribed slices
+    into the Rejected NSSAI and keeps the subscribed slices in the Allowed
+    NSSAI. With that change, it would skip re-allocation whenever no other AMF
+    exists. You could also add a SendRegistrationReject call on the
+    failed-reroute path, so the CU gets a reply instead of waiting for its
+    timer.
+
+  Tell me which fix you want, and I will make it.
+
+✻ Cogitated for 1m 39s · done 1:38 PM
+
+❯ "Fix the AMF code to reject unsubscribed slices", will AMF still able to      
+  allow other supported nssai?                                                  
+
+● Before answering, I want to confirm one thing in the code: whether the AMF's
+  Registration Accept builder already sends a Rejected NSSAI to the UE. This
+  command searches the AMF source for the Rejected NSSAI fields.
+
+● Bash(cd
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/amf
+      && grep -rn "RejectedNSSAI\|RejectedNssaiInPlmn\|RejectedNssaiInTa"
+      --include=*.go…)
+  ⎿  internal/gmm/message/build.go:573:         if
+     len(ue.NetworkSliceInfo.RejectedN
+     ssaiInPlmn) != 0 || len(ue.NetworkSliceInfo.RejectedNssaiInTa) != 0 {
+     internal/gmm/message/build.go:575:                         ue.NetworkSliceI
+     P
+     … +20 lines (ctrl+o to expand)
+
+● This reads build.go:565-580 to see what condition guards the Rejected NSSAI in
+  the Registration Accept.
+
+  Read 1 file (ctrl+o to expand)
+
+● Yes. With this fix, the AMF still allows every requested slice that is both
+  subscribed and supported. It moves only the unsubscribed slices into the
+  Rejected NSSAI, and the Registration Accept carries both lists.
+
+  What the UE would get in this test
+
+  Your config sets allowedNssaiMode: allSubscribedAlways. With that setting,
+  this UE's Registration Accept would contain:
+
+  ┌──────────────────┬─────────────────┬────────────────────────────────────┐
+  │   List in the    │                 │                                    │
+  │  Registration    │     Slices      │    Where each slice comes from     │
+  │      Accept      │                 │                                    │
+  ├──────────────────┼─────────────────┼────────────────────────────────────┤
+  │ Allowed NSSAI    │ 1/0007D0,       │ The UE requested these slices, and │
+  │                  │ 1/000BB8        │  the subscription contains them.   │
+  ├──────────────────┼─────────────────┼────────────────────────────────────┤
+  │                  │ 1/000001,       │ allSubscribedAlways adds the       │
+  │                  │ 1/000BB9        │ subscribed slices that the UE did  │
+  │                  │                 │ not request (handler.go:1356).     │
+  ├──────────────────┼─────────────────┼────────────────────────────────────┤
+  │                  │ 1/050601,       │ The UE requested these slices, but │
+  │ Rejected NSSAI   │ 2/050602,       │  the subscription does not contain │
+  │                  │ 3/050603,       │  them.                             │
+  │                  │ 3/050503        │                                    │
+  └──────────────────┴─────────────────┴────────────────────────────────────┘
+
+  The UE can then open PDU sessions on the four allowed slices.
+
+  What the code change would be
+
+  1. Remove the break, and stop setting needSliceSelection for unsubscribed 
+     slices (handler.go:1194-1197). The loop then checks every requested slice
+     instead of stopping at the first unsubscribed one. Each unsubscribed slice
+     goes into ue.NetworkSliceInfo.RejectedNssaiInPlmn with cause 0. Cause 0
+     means "S-NSSAI not available in the current PLMN".
+  2. Leave the Registration Accept builder unchanged. build.go:572-578 already
+     copies RejectedNssaiInPlmn and RejectedNssaiInTa into the Registration
+     Accept's RejectedNSSAI field. Today that field is always empty, because
+     nothing fills it on this path.
+  3. The re-allocation path (NSSF query, then target AMF search, then 
+     RerouteNASRequest) would no longer run for unsubscribed slices. It would
+     still run for a slice that is subscribed but missing from the AMF
+     plmnSupportList, because that check at line 1204 stays as it is.
+
+  ★ Insight ─────────────────────────────────────
+  - A slice rejected with cause 0 ("not available in the current PLMN") is
+    stored by the UE. TS 24.501 says the UE must not request that slice again in
+    this PLMN until the UE is switched off or the USIM is removed. Adding
+    1/050601 to the subscription later would not help this UE until it restarts.
+  - Cause 1 ("not available in the current registration area") lasts only until
+    the UE leaves the registration area. If you want the UE to retry the slice
+    sooner, cause 1 is the softer choice. Tell me which cause you want.
+  - Step 3 matters for your other check: a subscribed slice that is missing from
+    the AMF plmnSupportList, such as 3/050503 if it were ever subscribed, would
+    still take the re-allocation path and still fail silently. If you want, I
+    can put that case into the Rejected NSSAI too. That is a separate decision
+    from this fix, so I have not assumed it.
+    ─────────────────────────────────────────────────
+
+  Do you want me to make this change? Please also choose the reject cause, 0 or
+  1.
+
+✻ Crunched for 32s · done 1:42 PM
+
+❯ yes, use cause 1 (but make sue it is clear in log: The UE requested these     
+  slices, but the subscription does not, contain them.)                         
+
+● First I check the types to use. This command looks up the NetworkSliceInfo
+  model fields and the reject-cause constants in the NAS library.
+
+● Bash(M=$(go list -m -f '{{.Dir}}' github.com/free5gc/openapi); grep -rn
+      "RejectedNssaiInTa\|^type AuthorizedNetworkSliceInfo"
+      $M/models/model_authorized_network_slic…)
+  ⎿  /home/loren/go/pkg/mod/github.com/free5gc/openapi@v1.1.0/models/model_
+     authorized_network_slice_info.go:16:type AuthorizedNetworkSliceInfo st
+     ruct {
+     … +33 lines (ctrl+o to expand)
+  Searched for 1 pattern (ctrl+o to expand)
+
+● The comparison ignores letter case through openapi.SnssaiEqualFold, and I will
+  reuse that function. This command checks whether handler.go already imports
+  openapi.
+
+● Bash(sed -n '1,45p' internal/gmm/handler.go | grep -n '"')
+  ⎿  4: "bytes"
+     5: "crypto/sha256"
+     6: "encoding/hex"
+     … +30 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Update(NFs/amf/internal/context/amf_ue.go)
+  ⎿  Added 17 lines
+      525    return false
+      526  }
+      527  
+      528 +// [WNC] AddRejectedNssaiInTa records an S-NSSAI that the Regi
+          +stration Accept must                                          
+      529 +// reject with cause #1 "S-NSSAI not available in the current 
+          +registration area"                                            
+      530 +// (nasConvert.RejectedNssaiToNas encodes RejectedNssaiInTa wi
+          +th that cause).                                               
+      531 +// It returns false when the S-NSSAI is already in the list.  
+      532 +func (ue *AmfUe) AddRejectedNssaiInTa(targetSNssai models.Snss
+          +ai) bool {                                                    
+      533 +  if ue.NetworkSliceInfo == nil {                             
+      534 +    ue.NetworkSliceInfo = &models.AuthorizedNetworkSliceInfo{}
+      535 +  }                                                           
+      536 +  for _, rejectedSnssai := range ue.NetworkSliceInfo.RejectedN
+          +ssaiInTa {                                                    
+      537 +    if openapi.SnssaiEqualFold(rejectedSnssai, targetSNssai) {
+      538 +      return false                                            
+      539 +    }                                                         
+      540 +  }                                                           
+      541 +  ue.NetworkSliceInfo.RejectedNssaiInTa = append(ue.NetworkSli
+          +ceInfo.RejectedNssaiInTa, targetSNssai)                       
+      542 +  return true                                                 
+      543 +}                                                             
+      544 +                                                              
+      545  func (ue *AmfUe) GetNsiInformationFromSnssai(anType models.Acc
+           essType, snssai models.Snssai) *models.NsiInformation {
+      546    for _, allowedSnssai := range ue.AllowedNssai[anType] {
+      547      if openapi.SnssaiEqualFold(*allowedSnssai.AllowedSnssai, s
+           nssai) {
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(NFs/amf/internal/gmm/handler.go)
+  ⎿  Added 14 lines, removed 2 lines
+      1192            ue.AllowedNssai[anType] = append(ue.AllowedNssai[an
+            Type], allowedSnssai)
+      1193          }
+      1194        } else {
+      1195 -        needSliceSelection = true                            
+      1196 -        break                                                
+      1195 +        // [WNC] Do not start AMF re-allocation for a slice t
+           +hat is missing from the                                      
+      1196 +        // subscription. Reject only that slice in the Regist
+           +ration Accept with cause #1,                                 
+      1197 +        // and keep checking the other requested slices so th
+           +ey can still be allowed.                                     
+      1198 +        rejectedSnssai := models.Snssai{                     
+      1199 +          Sst: requestedSnssai.ServingSnssai.Sst,            
+      1200 +          Sd:  requestedSnssai.ServingSnssai.Sd,             
+      1201 +        }                                                    
+      1202 +        if ue.AddRejectedNssaiInTa(rejectedSnssai) {         
+      1203 +          ue.GmmLog.Warnf("[WNC] Rejected NSSAI: the UE reque
+           +sted S-NSSAI [SST:%d SD:%s], "+                              
+      1204 +            "but the subscription does not contain it; reject
+           +ed with cause #1 "+                                          
+      1205 +            "(S-NSSAI not available in the current registrati
+           +on area)",                                                   
+      1206 +            rejectedSnssai.Sst, rejectedSnssai.Sd)           
+      1207 +        }                                                    
+      1208 +        continue                                             
+      1209        }
+      1210  
+      1211        reqSnssai := models.Snssai{
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc &&
+      make amf 2>&1 | tail -5 && cd NFs/amf && go vet ./internal/gmm/
+      ./internal/context/ &&…)
+  ⎿  Start building amf....
+     cd NFs/amf/cmd && \
+     CGO_ENABLED=0 go build -gcflags "" -ldflags "-X github.com/free5gc/uti
+     … +7 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+  ⎿  Found 12 new diagnostic issues in 3 files (ctrl+o to expand)
+
+● Both edits build. go vet passes, and the existing gmm and context tests pass.
+  The editor warnings point at lines 143, 1487, 1927 and other lines that this
+  change did not touch, so they existed before the change.
+
+  What changed
+
+  internal/context/amf_ue.go: The new AddRejectedNssaiInTa method adds a slice
+  to ue.NetworkSliceInfo.RejectedNssaiInTa. It creates ue.NetworkSliceInfo if
+  that is nil. If the slice is already in the list, the method skips it and
+  returns false. It compares slices with openapi.SnssaiEqualFold, so 0007d0 and
+  0007D0 count as the same slice.
+
+  internal/gmm/handler.go, inside handleRequestedNssai: When a requested slice
+  is not in the subscription, the AMF now does three things:
+  1. It adds the slice to the Rejected NSSAI. The existing code at
+     build.go:572-578 puts that list into the Registration Accept, and
+     nasConvert.RejectedNssaiToNas encodes it with cause 1.
+  2. It logs a warning for that slice.
+  3. It continues with the next requested slice. It no longer starts AMF
+     re-allocation.
+
+  What the log will show for this UE
+
+  [WARN][Gmm] [WNC] Rejected NSSAI: the UE requested S-NSSAI [SST:1 SD:050601], 
+  but the subscription does not contain it; rejected with cause #1 (S-NSSAI not 
+  available in the current registration area)
+  [WARN][Gmm] [WNC] Rejected NSSAI: the UE requested S-NSSAI [SST:2 SD:050602], 
+  ...
+  [WARN][Gmm] [WNC] Rejected NSSAI: the UE requested S-NSSAI [SST:3 SD:050603], 
+  ...
+  [WARN][Gmm] [WNC] Rejected NSSAI: the UE requested S-NSSAI [SST:3 SD:050503], 
+  ...
+  [INFO][Gmm] [WNC] allowedNssaiMode=allSubscribedAlways: added 2 extra 
+  subscribed slice(s), Allowed NSSAI now has 4 slice(s)
+
+  Each log line carries the UE's supi field, because the warning uses ue.GmmLog.
+
+  ★ Insight ─────────────────────────────────────
+  - Suppose every requested slice is unsubscribed. AllowedNssai would then be
+    empty, and the existing fallback at handler.go:1331 would fill it from the
+    subscribed slices. The Registration Accept would still go out, so this
+    change cannot bring back the "no answer to the CU" failure for unsubscribed
+    slices.
+  - One path to re-allocation remains. A slice that is subscribed but missing
+    from the AMF plmnSupportList still triggers it through the check at line
+    1204, and that path can still fail without a reply. Your current config does
+    not hit this case, because all four subscribed slices are in
+    plmnSupportList.
+    ─────────────────────────────────────────────────
+
+  To test it
+
+  The new binary is at free5gc/bin/amf. Copy it to the cn machine and restart
+  free5gc. Then re-register the UE and check three things:
+  - The pcap should show InitialContextSetupRequest, Registration accept. In
+    that message, Allowed NSSAI should list 4 slices, and Rejected NSSAI should
+    list 4 slices, each with cause 1.
+  - The log should contain the four [WNC] Rejected NSSAI lines.
+  - The log should not contain Send Reroute Nas Request or ContextSetup Fail.
+
+  I have not committed the change. Tell me when you want a commit.
+
+✻ Worked for 1m 59s · done 1:47 PM
+
+❯ Show me the edited file list, I will copy to remote CN and compile there.     
+
+● This command shows the uncommitted changes in the AMF repository, so the file
+  list comes from git rather than from my memory.
+
+● Bash(git status --short && git diff --stat)
+  ⎿   M internal/context/amf_ue.go
+      M internal/gmm/handler.go
+      M internal/policy/ue_policy_tmobile_test.go
+     … +5 lines (ctrl+o to expand)
+
+● This fix changed two files:
+
+  ┌────────────────────────────────────┬─────────────────────────────────────┐
+  │    File (relative to free5gc/)     │               Change                │
+  ├────────────────────────────────────┼─────────────────────────────────────┤
+  │ NFs/amf/internal/context/amf_ue.go │ Adds the AddRejectedNssaiInTa       │
+  │                                    │ method (+17 lines)                  │
+  ├────────────────────────────────────┼─────────────────────────────────────┤
+  │                                    │ Changes the unsubscribed-slice      │
+  │ NFs/amf/internal/gmm/handler.go    │ branch in handleRequestedNssai (+16 │
+  │                                    │  / −2 lines)                        │
+  └────────────────────────────────────┴─────────────────────────────────────┘
+
+  Full local paths:
+  /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/amf/int
+  ernal/context/amf_ue.go
+  /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/amf/int
+  ernal/gmm/handler.go
+
+  Git also lists internal/policy/ue_policy_tmobile_test.go (modified) and
+  internal/policy/ue_policy_00101_test.go (untracked) in the AMF repository.
+  This fix did not touch those two files. They were already changed before this
+  session, and you do not need to copy them for this fix.
+
+  To build on the CN, run make amf from the free5gc directory there.
+
+✻ Churned for 11s · done 1:48 PM
+
+※ recap: The goal is to make the AMF send Registration Accept, and the fix now rejects unsubscribed slices with cause 1 instead of dropping the registration. Next, copy amf_ue.go and handler.go to the CN, run make amf there, and re-register the UE. (disable recaps in /config)
+
+❯ It works, now I remember I have fixed a problem that RRC release too fast?    
+
+● I will look for an earlier fix about the RRC release happening too fast. This
+  command searches the commit messages in the free5gc repository and in the AMF
+  repository for words such as "release", "RRC", "UEContextRelease" and
+  "inactivity".
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc &&
+      echo "== free5gc =="; git log --oneline -i -E
+      --grep='release|rrc|inactiv|ue ?context ?…)
+  ⎿  == free5gc ==
+     66c5eb8 workaround: prevent UE PDU release on T-Mobile slices caused b
+     y IPv6-only URSP (no RA in time); lowercase SD in config; bump smf/udr
+     … +67 lines (ctrl+o to expand)
+
+● Bash(git -C NFs/amf show --stat --format='%h %ad%n%B' --date=short a0aac9e |
+      head -40; git show --stat --format='%h %ad %s' --date=short a992206 | head
+      -15)
+  ⎿  a0aac9e 2026-07-15
+     feat(amf): treat FOR=0 Initial Registration as follow-on (config-gated
+     )
+     … +45 lines (ctrl+o to expand)
+
+● That is the fix. This command checks whether the flag is turned on in the
+  test's CN config and in your local config/amfcfg.yaml.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Yes. You fixed it on 2026-07-15, and the fix is still in place and turned on.
+
+  The earlier fix
+
+  Commits: AMF a0aac9e ("treat FOR=0 Initial Registration as follow-on
+  (config-gated)"). The free5gc commit a992206 moved the AMF to that version and
+  turned the flag on in config/amfcfg.yaml.
+
+  The problem it fixed: The T-Mobile 310-260 UE (imsi-310260000013069, the same
+  UE as in today's test) sends its Initial Registration with the Follow-On
+  Request (FOR) bit set to 0. FOR=0 tells the AMF that the UE has nothing more
+  to send after registration. When FOR=0 and no Uplink Data Status is present,
+  stock free5gc releases the N2 connection right after Registration Complete
+  (HandleRegistrationComplete). That release is legal under the spec. The gNB
+  then releases RRC too. The UE could not set up its default PDU session on that
+  connection, so it re-registered 8 times before a Service Request finally set
+  up the PDU session.
+
+  The fix: A new config flag, treatInitialRegAsFollowOn, makes the AMF treat a
+  FOR=0 Initial Registration as if FOR=1 were set. The AMF then keeps the N2
+  connection, and only the gNB RRC inactivity timer ends it. No new AMF timer
+  was added. When the flag fires, the AMF logs:
+  WNC: keeping N2 connection after registration: FOR=0 treated as FOR=1 
+  (treatInitialRegAsFollowOn=on; release deferred to gNB RRC inactivity)
+
+  Current state
+
+  ┌─────────────────────────────────────────┬───────────────────────────────┐
+  │                  Place                  │            Setting            │
+  ├─────────────────────────────────────────┼───────────────────────────────┤
+  │ NFs/amf/pkg/factory/config.go:104       │ TreatInitialRegAsFollowOn     │
+  │                                         │ field exists (default false)  │
+  ├─────────────────────────────────────────┼───────────────────────────────┤
+  │ config/amfcfg.yaml:260 (local)          │ treatInitialRegAsFollowOn:    │
+  │                                         │ true                          │
+  ├─────────────────────────────────────────┼───────────────────────────────┤
+  │ CN config in today's test               │ treatInitialRegAsFollowOn:    │
+  │ (my_logs/.../config/amfcfg.yaml:264)    │ true                          │
+  └─────────────────────────────────────────┴───────────────────────────────┘
+
+  ★ Insight ─────────────────────────────────────
+  - Today's failure and the FOR=0 fix are separate problems. Today's failure
+    happened at ContextSetup, before any Registration Accept. The FOR=0 fix acts
+    later, at Registration Complete, so it could not help or hurt today's
+    failure.
+  - Today's fix made the Registration Accept go out, so the UE now reaches
+    Registration Complete. That is where treatInitialRegAsFollowOn takes effect.
+    If the CN log after your successful test shows the FOR=0 treated as FOR=1
+    line, both fixes ran in order.
+  - The commit lists one known issue that is still open. URSP (UE Route
+    Selection Policy) delivery fires right after Registration Accept, which is
+    before the default PDU session is accepted. The commit points to
+    test14/DEBUG_ue_policy_delivery_timing.md for details.
+    ─────────────────────────────────────────────────
+
+✻ Cogitated for 34s · done 2:06 PM
+
+❯ After our first fix, there is one more problem, CN keep release UE with cause 
+  "ErrorIndication"                                                             
+                                                                                
+  In log:/home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_ 
+  logs/test-3-cn-keep-release-ue-with-cause/free5gc/log/20261007_135918/free5gc 
+  .pcap                                                                         
+                                                                                
+  // The first RRC release I understand, UE does not do anything in 3 seconds   
+  No.    Time    Source    Destination    Protocol    Length    Info            
+  1289    14:01:47.043730    192.168.0.2    192.168.0.184    NGAP/NAS-5GS       
+  356    DownlinkNASTransport, DL NAS transport, MANAGE UE POLICY COMMAND       
+  1293    14:01:47.070967    192.168.0.184    192.168.0.2    NGAP/NAS-5GS       
+  132    UplinkNASTransport, UL NAS transport, MANAGE UE POLICY COMPLETE        
+  1491    14:01:50.278541    192.168.0.184    192.168.0.2    NGAP    96         
+  UEContextReleaseRequest [Cause:                                               
+  RadioNetwork=release-due-to-ngran-generated-reason]                           
+  1493    14:01:50.279313    192.168.0.2    192.168.0.184    NGAP    108        
+  SACK (Ack=9, Arwnd=106496) , UEContextReleaseCommand [Cause:                  
+  RadioNetwork=release-due-to-ngran-generated-reason]                           
+  1497    14:01:50.398479    192.168.0.184    192.168.0.2    NGAP    112        
+  UEContextReleaseComplete                                                      
+                                                                                
+  // But why CN release UE this time??                                          
+  1501    14:01:50.653536    192.168.0.184    192.168.0.2    NGAP/NAS-5GS       
+  144    InitialUEMessage, Service request [RRCEstablishmentCause=mo-Data]      
+  1503    14:01:50.654439    192.168.0.2    192.168.0.184    NGAP    112        
+  SACK (Ack=11, Arwnd=106496) , ErrorIndication                                 
+  1507    14:01:50.654647    192.168.0.2    192.168.0.184    NGAP    92         
+  UEContextReleaseCommand [Cause: Protocol=unspecified]                         
+  1511    14:01:50.773488    192.168.0.184    192.168.0.2    NGAP    112        
+  UEContextReleaseComplete                                                      
+
+● This command prints the non-trace AMF log lines and all errors/warnings
+  between 14:01:50.6 and 14:01:50.8, which covers the Service Request (frame
+  1501) and the ErrorIndication (frame 1503).
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_
+      logs/test-3-cn-keep-release-ue-with-cause/free5gc/log/20261007_135918 &&
+      grep -nE 'time…)
+  ⎿  1453:time="2026-10-07T14:01:50.653872182+08:00" level="info" msg="Hand
+     le InitialUEMessage" CAT="Ngap" NF="AMF" ran_addr="192.168.0.184:38412
+     "
+     … +30 lines (ctrl+o to expand)
+
+● Bash(tshark -r free5gc.pcap -Y 'frame.number==1501' -O ngap,nas-5gs
+      2>/dev/null | grep -vE '^\s*$' | sed -n '/NG Application Protocol/,$p' |
+      head -80)
+  ⎿  NG Application Protocol (InitialUEMessage)
+         NGAP-PDU: initiatingMessage (0)
+             initiatingMessage
+     … +71 lines (ctrl+o to expand)
+
+● Bash(cd
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/amf
+      && grep -rn "Missing 5G-S-TMSI" --include=*.go internal)
+  ⎿  internal/ngap/handler.go:480:              ranUe.Log.Warnf("Missing 5G-S-TMSI
+     IE in
+     InitialUEMessage; send ErrorIndication")
+● This reads internal/ngap/handler.go around line 480, to see the condition that
+  sends the ErrorIndication and what the code does when the IE is present.
+
+  Read 1 file (ctrl+o to expand)
+
+● Bash(git blame -L 471,489 --date=short internal/ngap/handler.go | cut -c1-70;
+      grep -rn "func GetNas5GSMobileIdentity" -A40 internal/nas/*.go | head -50)
+  ⎿  7907d3c0 (brianchennn 2023-05-20 471)      } else if regReqType == nasMess
+     7907d3c0 (brianchennn 2023-05-20 472)              // NGAP 5G-S-TMSI IE mig
+     7907d3c0 (brianchennn 2023-05-20 473)              // Need to get 5GSMobile
+     … +30 lines (ctrl+o to expand)
+
+
+
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_
+      logs/test-3-cn-keep-release-ue-with-cause/free5gc && grep -noE
+      'guti:[0-9a-fA-F]+|GUTI\…)
+  ⎿  832:GUTI[46611cafe0000000003]
+     825:guti:46611cafe0000000001
+     3300:guti:46611cafe0000000002
+     … +14 lines (ctrl+o to expand)
+
+● Bash(cd log/20261007_135918 && tshark -r free5gc.pcap -Y
+      'nas-5gs.mm.message_type == 0x42' -O nas-5gs 2>/dev/null | grep -E
+      '^Frame|Mobile Country Code|Mobile Networ…)
+  ⎿  Frame 1199: Packet, 280 bytes on wire (2240 bits), 280 bytes captured
+     (2240 bits)
+     Frame 3215: Packet, 280 bytes on wire (2240 bits), 280 bytes captured
+     … +3 lines (ctrl+o to expand)
+
+● Bash(tshark -r free5gc.pcap -o nas-5gs.null_decipher:TRUE -Y
+      'frame.number==1199' -O nas-5gs 2>/dev/null | grep -E 'Message type|Mobile
+      Country Code|Mobile Network C…)
+  ⎿  (No output)
+
+● Bash(tshark -r free5gc.pcap -o nas-5gs.null_decipher:TRUE -Y
+      'frame.number==1199' -V 2>/dev/null | sed -n '/Non-Access-Stratum/,$p' |
+      grep -vE '^\s*$' | head -45)
+  ⎿                                          Non-Access-Stratum 5GS (NAS)PD
+     U
+                                                 Security protected NAS 5GS
+     … +55 lines (ctrl+o to expand)
+
+● The GUTI is confirmed. One last count: the user said the CN "keeps" releasing
+  the UE, so this command counts the Missing 5G-S-TMSI warnings and shows when
+  each one happened.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● What went wrong
+
+  The UE wakes up and sends a Service Request. The CU forwards it in an NGAP
+  InitialUEMessage, but the CU leaves out the optional 5G-S-TMSI information
+  element. 5G-S-TMSI is the short temporary identity that the AMF uses to find
+  the UE's stored context. The free5gc AMF refuses any InitialUEMessage without
+  that field, except one carrying an Initial Registration. It answers with
+  ErrorIndication and then releases the UE with cause Protocol=unspecified.
+
+  The UE retries immediately, so the cycle repeats. The log has 3020 Missing 
+  5G-S-TMSI IE in InitialUEMessage; send ErrorIndication warnings, about 5–6 per
+  second, from 14:01:50 onward.
+
+  Evidence
+
+  1. The CU leaves out the field (frame 1501, decoded with tshark). The
+  InitialUEMessage carries 5 fields: RAN-UE-NGAP-ID, NAS-PDU,
+  UserLocationInformation, RRCEstablishmentCause and UEContextRequest. It has no
+  id-FiveG-S-TMSI (IE id 26).
+
+  2. The UE's identity is inside the NAS message. The Service Request carries
+  5GS mobile identity: 5G-S-TMSI, with AMF Set ID 1016, AMF Pointer 0 and
+  5G-TMSI 1. That identity matches the GUTI the AMF gave this UE in the
+  Registration Accept (frame 1199): 466-11 / Region 202 (0xCA) / Set 1016 / 
+  Pointer 0 / TMSI 1, stored as 46611cafe0000000001. The AMF has this UE and
+  could have found it.
+
+  3. The AMF code (NFs/amf/internal/ngap/handler.go:458-489) picks the identity
+  like this:
+
+  if fiveGSTMSI != nil {                 // NGAP field present → use it
+      ...
+  } else if regReqType == InitialRegistration {   // only exception
+      id, idType, err = amf_nas.GetNas5GSMobileIdentity(gmmMessage)
+  } else {                               // ← Service Request lands here
+      ranUe.Log.Warnf("Missing 5G-S-TMSI IE in InitialUEMessage; send 
+  ErrorIndication")
+      sendErrorMessage(...)
+      ngap_message.SendUEContextReleaseCommand(...,
+  CauseProtocolPresentUnspecified)
+      return
+  }
+
+  This is stock free5gc code from upstream commit 7907d3c0 (2023-05-20). No
+  local change caused it. The first fix today did not cause it either. That fix
+  only made the Registration Accept go out, which let the UE get far enough to
+  send a Service Request.
+
+  Why this did not happen before
+
+  Before today's first fix, the UE never finished registration, so it never sent
+  a Service Request. Earlier tests with the FOR=0 fix (test14) report that the
+  UE held its connection until it deregistered. In those tests the UE did not go
+  idle and come back with a Service Request, so this path did not run.
+
+  ★ Insight ─────────────────────────────────────
+  - In TS 38.413, 5G-S-TMSI is an optional field of InitialUEMessage. A gNB
+    normally includes it when the UE gives its 5G-S-TMSI over RRC: part 1 in
+    RRCSetupRequest (ng-5G-S-TMSI-Part1) and part 2 in RRCSetupComplete. When
+    the field is missing, either the UE sent a random value in RRC instead of
+    its S-TMSI, or the CU dropped it. The CN pcap cannot tell which. The CU log
+    or an RRC trace is needed.
+  - The AMF already has a helper that reads the 5G-S-TMSI from a Service
+    Request: GetNas5GSMobileIdentity (internal/nas/handler.go:67). It returns
+    the same string format as the NGAP path, so findAmfUe would find
+    46611cafe0000000001. Upstream only calls it for Initial Registration.
+  - One more observation, not verified as related: the AMF gave a UE camped on
+    310-260 a GUTI from PLMN 466-11. 466-11 is the first entry in
+    servedGuamiList, and the AMF uses that entry for every UE. 466-11 is in the
+    Equivalent PLMN list, so the GUTI is still usable. It is possible, but not
+    proven, that the UE does not offer its S-TMSI over RRC because the GUTI's
+    PLMN differs from the PLMN it is camped on. An RRC trace would show this.
+    ─────────────────────────────────────────────────
+
+  Options (I have not changed anything)
+
+  1. AMF fallback (code change in internal/ngap/handler.go). When the NGAP
+     5G-S-TMSI field is missing, the AMF would read the identity from the NAS
+     message for a Service Request too, not only for an Initial Registration. It
+     would log a clear [WNC] warning that the CU left out the field. The
+     Service Request would then find the UE, and the release loop would stop.
+  2. CU or UE side. Check the CU log, or an RRC trace, for the RRCSetupRequest
+     before frame 1501. If ue-Identity is randomValue, the UE did not give its
+     S-TMSI. If it is ng-5G-S-TMSI-Part1, the CU dropped the field.
+  3. GUTI PLMN. Make the AMF assign the GUTI from the servedGuamiList entry that
+     matches the UE's PLMN (310-260 → cafe03). This is a larger change. Do it
+     only if option 2 shows that the PLMN mismatch is the reason.
+
+  Which option do you want? Option 1 fixes the loop on the CN side no matter
+  what the CU does. Option 2 tells you why the field is missing.
+
+✻ Sautéed for 2m 8s · done 2:23 PM
+
+❯ Can you tell me the field name of ue-Identity in wireshark so I can reach it? 
+
+● This command lists the Wireshark NR RRC fields for ue-Identity and the
+  5G-S-TMSI parts, so I can give you exact filter names instead of guessing
+  them.
+
+● Bash(tshark -G fields 2>/dev/null | awk -F'\t' '$3 ~
+      /^nr-rrc\.(ue_Identity|ng_5G_S_TMSI|randomValue|ng_5G_S_TMSI_Part|ng_5G_S_
+      TMSI_Value|rrcSetupRequest_element|rrc…)
+  ⎿  nr-rrc.rrcSetupRequest_element     rrcSetupRequest
+     nr-rrc.rrcSetupComplete_element    rrcSetupComplete
+     nr-rrc.ue_Identity ue-Identity
+     … +9 lines (ctrl+o to expand)
+
+● These are the Wireshark field names (checked with TShark 4.6.6):
+
+  RRCSetupRequest: what the UE uses as its identity
+
+  ┌────────────────────────────────┬─────────────────────────────────────────┐
+  │      Display filter field      │                 Meaning                 │
+  ├────────────────────────────────┼─────────────────────────────────────────┤
+  │ nr-rrc.rrcSetupRequest_element │ The RRCSetupRequest message             │
+  ├────────────────────────────────┼─────────────────────────────────────────┤
+  │ nr-rrc.ue_Identity             │ The choice the UE made: 0 =             │
+  │                                │ ng-5G-S-TMSI-Part1, 1 = randomValue     │
+  ├────────────────────────────────┼─────────────────────────────────────────┤
+  │ nr-rrc.ng_5G_S_TMSI_Part1      │ 39-bit part 1 of the 5G-S-TMSI (present │
+  │                                │  only when the choice is 0)             │
+  ├────────────────────────────────┼─────────────────────────────────────────┤
+  │ nr-rrc.randomValue             │ 39-bit random value (present only when  │
+  │                                │ the choice is 1)                        │
+  ├────────────────────────────────┼─────────────────────────────────────────┤
+  │ nr-rrc.establishmentCause      │ RRC establishment cause (mo-Data in     │
+  │                                │ frame 1501)                             │
+  └────────────────────────────────┴─────────────────────────────────────────┘
+
+  RRCSetupComplete: the rest of the 5G-S-TMSI
+
+  ┌─────────────────────────────────┬────────────────────────────────────────┐
+  │      Display filter field       │                Meaning                 │
+  ├─────────────────────────────────┼────────────────────────────────────────┤
+  │ nr-rrc.rrcSetupComplete_element │ The RRCSetupComplete message           │
+  ├─────────────────────────────────┼────────────────────────────────────────┤
+  │ nr-rrc.ng_5G_S_TMSI_Value       │ The choice: the full 48-bit            │
+  │                                 │ ng-5G-S-TMSI, or ng-5G-S-TMSI-Part2    │
+  ├─────────────────────────────────┼────────────────────────────────────────┤
+  │ nr-rrc.ng_5G_S_TMSI_Part2       │ 9-bit part 2 (sent when part 1 went in │
+  │                                 │  the RRCSetupRequest)                  │
+  ├─────────────────────────────────┼────────────────────────────────────────┤
+  │ nr-rrc.ng_5G_S_TMSI             │ The full 48-bit 5G-S-TMSI (sent when   │
+  │                                 │ the RRCSetupRequest used randomValue)  │
+  └─────────────────────────────────┴────────────────────────────────────────┘
+
+  Example filters
+
+  nr-rrc.rrcSetupRequest_element
+  nr-rrc.ue_Identity == 1
+  nr-rrc.ng_5G_S_TMSI_Part1 || nr-rrc.ng_5G_S_TMSI_Part2 || nr-rrc.ng_5G_S_TMSI
+
+  The second filter shows only RRCSetupRequests in which the UE sent
+  randomValue.
+
+  Values to expect from this UE
+
+  The UE's 5G-S-TMSI is AMF Set ID 1016, AMF Pointer 0 and 5G-TMSI 1. As a
+  48-bit number, that is 0xFE0000000001. If the UE offers it over RRC:
+  - ng-5G-S-TMSI-Part1 (the lowest 39 bits) should be 0x0000000001.
+  - ng-5G-S-TMSI-Part2 (the highest 9 bits) should be 0x1FC, which is 508.
+
+  ★ Insight ─────────────────────────────────────
+  - The RRC messages are not in the CN pcap. RRC runs between the UE and the
+    gNB. Between the DU and the CU, RRC is carried inside F1AP RRCContainer
+    fields, on SCTP port 38472. Capture on the CU's F1 interface (or on the DU).
+    Wireshark decodes the NR RRC inside F1AP on its own.
+  - The reading works like this. If ue_Identity == 1 (randomValue) and the
+    RRCSetupComplete has no ng_5G_S_TMSI, the UE never gave its S-TMSI, and the
+    CU had nothing to forward. If the UE did send part 1 and part 2, the CU
+    dropped the 5G-S-TMSI field when it built the InitialUEMessage.
+    ─────────────────────────────────────────────────
+
+✻ Sautéed for 27s · done 2:29 PM
+
+❯ OK, I search in CU log:                                                       
+                                                                                
+   nr-rrc.ue_Identity is alwasy 1.                                              
+  "nr-rrc.ng_5G_S_TMSI_Part1 || nr-rrc.ng_5G_S_TMSI_Part2 ||                    
+  nr-rrc.ng_5G_S_TMSI" no output.                                               
+                                                                                
+  For quick solution, I will use option 1 for now, but I want to create a flag  
+  in amf.yaml(or other yaml) to enable it. Because I am not sure if it is the   
+  best sulotion for longterm.                                                   
+
+● The CU result shows that the UE never gives its 5G-S-TMSI over RRC. It always
+  sends randomValue, and no RRCSetupComplete carries part 2 or the full value.
+  So the CU has nothing to forward, and the root cause is on the UE side. Option
+  1 with a config flag is a reasonable workaround for that.
+
+  First I read how the existing flag treatInitialRegAsFollowOn is defined, so
+  the new flag follows the same pattern. This reads pkg/factory/config.go lines
+  90–160.
+
+  Read 1 file (ctrl+o to expand)
+
+● Bash(cd
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/amf
+      && grep -rn "func DecodePlainNasNoIntegrityCheck" -A30
+      internal/nas/nas_security/*…)
+  ⎿  internal/nas/nas_security/security.go:357:func DecodePlainNasNoIntegri
+     tyCheck(payload []byte) (*nas.Message, error) {
+     internal/nas/nas_security/security.go-358- const SecurityHeaderTypeMask
+     … +31 lines (ctrl+o to expand)
+
+
+● Update(NFs/amf/pkg/factory/config.go)
+  ⎿  User rejected update to NFs/amf/pkg/factory/config.go
+
+✻ Crunched for 33s · done 2:34 PM
+
+❯ The comment make me confused.                                                 
+                                                                                
+  You first say "an NGAP InitialUEMessage carrying a Service Request has no     
+  5G-S-TMSI IE" then yau say "the AMF takes the 5G-S-TMSI from the Service      
+  Request NAS message", isn't the problem is there is no 5G-S-TMSI? Then where  
+  are you going to get 5G-S-TMSI?                                               
+
+● The 5G-S-TMSI travels in two separate places in the same NGAP message. Only
+  one of them is missing:
+
+  ┌──────────────────────────────────┬─────────────┬────────────────────────┐
+  │              Place               │ Who fills   │     In frame 1501      │
+  │                                  │     it      │                        │
+  ├──────────────────────────────────┼─────────────┼────────────────────────┤
+  │                                  │ The CU,     │ Missing: the UE sent   │
+  │ NGAP 5G-S-TMSI IE of the         │ from what   │ randomValue in RRC, so │
+  │ InitialUEMessage (IE id 26)      │ the UE sent │  the CU had nothing to │
+  │                                  │  over RRC   │  copy                  │
+  ├──────────────────────────────────┼─────────────┼────────────────────────┤
+  │ 5GS mobile identity field inside │             │ Present: type          │
+  │  the NAS Service Request, which  │ The UE's    │ 5G-S-TMSI, AMF Set ID  │
+  │ the CU carries untouched in the  │ NAS layer   │ 1016, AMF Pointer 0,   │
+  │ NAS-PDU IE                       │             │ 5G-TMSI 1              │
+  └──────────────────────────────────┴─────────────┴────────────────────────┘
+
+  TS 24.501 requires the UE to put its 5G-S-TMSI in every Service Request, so
+  the NAS field is always there. In this UE, the RRC layer does not offer the
+  identity, but the NAS layer still does. The AMF can read the identity from the
+  NAS message instead of the NGAP IE.
+
+  The comment did not name the two places clearly. Here is a rewritten version
+  that names each one:
+
+        // [WNC] When true, and the NGAP InitialUEMessage carrying a Service Req
+  has no
+        // 5G-S-TMSI IE (IE id 26), the AMF reads the UE identity from the "5GS 
+  identity"
+        // field inside the Service Request NAS message instead. The NAS field a
+  carries
+        // the 5G-S-TMSI, because TS 24.501 requires it in every Service Request
+  NGAP IE is
+        // missing when the UE sends randomValue (not ng-5G-S-TMSI-Part1) in 
+  RRCSetupRequest,
+        // because the gNB then has no 5G-S-TMSI to copy into the InitialUEMessa
+        // When false, the AMF keeps the stock behaviour: ErrorIndication + 
+  UEContextReleaseCommand.
+        UseNasIdentityIfNgapSTmsiMissing bool
+  `yaml:"useNasIdentityIfNgapSTmsiMissing,omitempty" 
+  valid:"type(bool),optional"`
+
+  Do you want me to add the field with this comment? Or would you like to change
+  the wording or the key name useNasIdentityIfNgapSTmsiMissing first?
+
+
+✻ Churned for 11s · done 2:36 PM
+
+❯ yes, add it with this comment                                                 
+
+● Edit 1 of 3: pkg/factory/config.go. This edit adds the
+  UseNasIdentityIfNgapSTmsiMissing field, with the comment you approved, right
+  after TreatInitialRegAsFollowOn.
+
+● Update(NFs/amf/pkg/factory/config.go)
+  ⎿  Added 8 lines
+      102    // a default PDU session. The held connection is bounded by 
+           the gNB's RRC inactivity timer,
+      103    // exactly like a real FOR=1 UE. Default false = stock behav
+           iour.
+      104    TreatInitialRegAsFollowOn bool `yaml:"treatInitialRegAsFollo
+           wOn,omitempty" valid:"type(bool),optional"`
+      105 +  // [WNC] When true, and the NGAP InitialUEMessage carrying a
+          + Service Request has no                                       
+      106 +  // 5G-S-TMSI IE (IE id 26), the AMF reads the UE identity fr
+          +om the "5GS mobile identity"                                  
+      107 +  // field inside the Service Request NAS message instead. The
+          + NAS field always carries                                     
+      108 +  // the 5G-S-TMSI, because TS 24.501 requires it in every Ser
+          +vice Request. The NGAP IE is                                  
+      109 +  // missing when the UE sends randomValue (not ng-5G-S-TMSI-P
+          +art1) in RRCSetupRequest,                                     
+      110 +  // because the gNB then has no 5G-S-TMSI to copy into the In
+          +itialUEMessage.                                               
+      111 +  // When false, the AMF keeps the stock behaviour: ErrorIndic
+          +ation + UEContextReleaseCommand.                              
+      112 +  UseNasIdentityIfNgapSTmsiMissing bool `yaml:"useNasIdentityI
+          +fNgapSTmsiMissing,omitempty" valid:"type(bool),optional"`     
+      113    // WNC: Controls whether the AMF delivers UE Policy (URSP) t
+           o the UE via the DL NAS
+      114    // Transport "Manage UE Policy Command" after registration. 
+           This gates every delivery
+      115    // path: the 3GPP PCF flow (UEPolicyControlCreate -> PCF -> 
+           N1N2 transparent forward),
+
+● Update(NFs/amf/internal/ngap/handler.go)
+  ⎿  Added 9 lines
+      474  
+      475      id, idType, err = amf_nas.GetNas5GSMobileIdentity(gmmMessa
+           ge)
+      476      ran.Log.Infof("5GSMobileIdentity [%q:%q, err: %v]", idType
+           , id, err)
+      477 +  } else if nasMsgType == nas.MsgTypeServiceRequest &&        
+      478 +    factory.AmfConfig.Configuration.UseNasIdentityIfNgapSTmsiM
+          +issing {                                                      
+      479 +    // [WNC] The NGAP 5G-S-TMSI IE is missing, but the Service
+          + Request NAS message always                                   
+      480 +    // carries the 5G-S-TMSI in its "5GS mobile identity" fiel
+          +d. Use that field, so the                                     
+      481 +    // AMF can find the stored UE context instead of releasing
+          + the UE.                                                      
+      482 +    id, idType, err = amf_nas.GetNas5GSMobileIdentity(gmmMessa
+          +ge)                                                           
+      483 +    ranUe.Log.Warnf("[WNC] InitialUEMessage has no NGAP 5G-S-T
+          +MSI IE; using the 5G-S-TMSI from the "+                       
+      484 +      "Service Request NAS message instead [%q:%q, err: %v] (u
+          +seNasIdentityIfNgapSTmsiMissing=true)",                       
+      485 +      idType, id, err)                                        
+      486    } else {
+      487      // Missing NGAP 5G-S-TMSI IE
+      488      var iesCriticalityDiagnostics ngapType.CriticalityDiagnost
+           icsIEList
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc &&
+      grep -n -B2 -A2 "treatInitialRegAsFollowOn" config/amfcfg.yaml)
+  ⎿  258-  # can set up its default PDU session without looping. Bounded by
+      the gNB RRC inactivity
+     259-  # timer. Default false = stock behaviour.
+     … +5 lines (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Update(config/amfcfg.yaml)
+  ⎿  User rejected update to config/amfcfg.yaml
+
+✻ Sautéed for 29s · done 2:42 PM
+
+❯ I want to comment and log to be more clear, because there are 2 identity from 
+  different layer/sub-item                                                      
+                                                                                
+  I want you to rewrite comment in config.go and handler.go and amf.yaml        
+  You may use a table if that will be more easy to understand.                  
+  ⎿  Found 20 new diagnostic issues in 2 files (ctrl+o to expand)
+
+● Update(NFs/amf/pkg/factory/config.go)
+  ⎿  User rejected update to NFs/amf/pkg/factory/config.go
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+✻ Worked for 25s · done 2:44 PM
+
+❯ Since this time the comment is long, I think we can add the most detailed     
+  comment in amf.yaml, then leave config.go and handler.go and logging to be    
+  brief                                                                         
+
+● Update(config/amfcfg.yaml)
+  ⎿  User rejected update to config/amfcfg.yaml
+
+✻ Cogitated for 22s · done 2:47 PM
+
+❯  275 +  # ng-5G-S-TMSI-Part1 in RRCSetupRequest, because the gNB then has no  
+  5G-S-TMSI to copy.                                                            
+  >> Don't you think it should be "so" not because?                             
+                                                                                
+   276 +  # The NAS IE "5GS mobile identity" is still present in that case. The 
+  T-Mobile 310-260 UE                                                           
+  >> The MTK UE                                                                 
+                                                                                
+  I also want to make sure, this is a fallback, right? if 5G-S-TMSI from NGAP   
+  present, CN still choose it over 5G-S-TMSI from NAS? (It is the normal        
+  behavior, right?)                                                             
+
+● Update(config/amfcfg.yaml)
+  ⎿  User rejected update to config/amfcfg.yaml
+
+✻ Worked for 25s · done 2:52 PM
+
+❯ You should add imsi-310260000013069, this sim card in used in Qualcomm modem  
+  someday.                                                                      
+
+● Update(config/amfcfg.yaml)
+  ⎿  Added 28 lines
+      258    # can set up its default PDU session without looping. Bounde
+           d by the gNB RRC inactivity
+      259    # timer. Default false = stock behaviour.
+      260    treatInitialRegAsFollowOn: true
+      261 +  # WNC: useNasIdentityIfNgapSTmsiMissing selects where the AM
+          +F reads the UE's 5G-S-TMSI for a                              
+      262 +  # Service Request. The gNB forwards a Service Request to the
+          + AMF inside an NGAP                                           
+      263 +  # InitialUEMessage. That one NGAP message can hold the 5G-S-
+          +TMSI in two different IEs:                                    
+      264 +  #                                                           
+      265 +  #   | IE                                   | Layer | Filled 
+          +by | Value comes from                    |                    
+      266 +  #   |--------------------------------------|-------|--------
+          +---|-------------------------------------|                    
+      267 +  #   | NGAP IE "5G-S-TMSI" (IE id 26)       | NGAP  | gNB (CU
+          +)  | ng-5G-S-TMSI-Part1 + Part2 that the |                    
+      268 +  #   |                                      |       |        
+          +   | UE sends in RRCSetupRequest and     |                    
+      269 +  #   |                                      |       |        
+          +   | RRCSetupComplete                    |                    
+      270 +  #   | NAS IE "5GS mobile identity" in the  | NAS   | UE     
+          +   | The UE's NAS layer. TS 24.501       |                    
+      271 +  #   | Service Request, carried inside NGAP |       |        
+          +   | requires this IE in every Service   |                    
+      272 +  #   | IE "NAS-PDU"                         |       |        
+          +   | Request                             |                    
+      273 +  #                                                           
+      274 +  # When the UE sends randomValue instead of ng-5G-S-TMSI-Part
+          +1 in RRCSetupRequest, the gNB                                 
+      275 +  # has no 5G-S-TMSI to copy, so the NGAP IE "5G-S-TMSI" is mi
+          +ssing. The NAS IE "5GS mobile                                 
+      276 +  # identity" is still present in that case. The MTK UE always
+          + sends randomValue                                            
+      277 +  # (CU log: nr-rrc.ue_Identity == 1).                        
+      278 +  #                                                           
+      279 +  # This flag is a fallback only. When the NGAP IE "5G-S-TMSI"
+          + is present, the AMF always uses                              
+      280 +  # it, whatever the value of this flag.                      
+      281 +  #                                                           
+      282 +  #   | Value           | AMF behaviour for a Service Request 
+          +without NGAP IE "5G-S-TMSI"   |                               
+      283 +  #   |-----------------|-------------------------------------
+          +------------------------------|                               
+      284 +  #   | false (default) | Stock: send ErrorIndication, then UE
+          +ContextReleaseCommand with    |                               
+      285 +  #   |                 | cause Protocol=unspecified. The UE r
+          +etries and is released again. |                               
+      286 +  #   | true            | Read the 5G-S-TMSI from NAS IE "5GS 
+          +mobile identity", and use it  |                               
+      287 +  #   |                 | to find the stored UE context.      
+          +                              |                               
+      288 +  useNasIdentityIfNgapSTmsiMissing: true                      
+      289    # WNC: master switch for UE Policy (URSP) delivery to the UE
+            via the DL NAS Transport
+      290    # "Manage UE Policy Command" after registration. Gates all d
+           elivery paths (PCF 3GPP flow,
+      291    # legacy TriggerUEPolicyDelivery, and PCF-notification SendU
+           EPolicyToUE). Omit the field to
+
+● Update(NFs/amf/pkg/factory/config.go)
+  ⎿  Added 3 lines, removed 7 lines
+      102    // a default PDU session. The held connection is bounded by 
+           the gNB's RRC inactivity timer,
+      103    // exactly like a real FOR=1 UE. Default false = stock behav
+           iour.
+      104    TreatInitialRegAsFollowOn bool `yaml:"treatInitialRegAsFollo
+           wOn,omitempty" valid:"type(bool),optional"`
+      105 -  // [WNC] When true, and the NGAP InitialUEMessage carrying a
+          - Service Request has no                                       
+      106 -  // 5G-S-TMSI IE (IE id 26), the AMF reads the UE identity fr
+          -om the "5GS mobile identity"                                  
+      107 -  // field inside the Service Request NAS message instead. The
+          - NAS field always carries                                     
+      108 -  // the 5G-S-TMSI, because TS 24.501 requires it in every Ser
+          -vice Request. The NGAP IE is                                  
+      109 -  // missing when the UE sends randomValue (not ng-5G-S-TMSI-P
+          -art1) in RRCSetupRequest,                                     
+      110 -  // because the gNB then has no 5G-S-TMSI to copy into the In
+          -itialUEMessage.                                               
+      111 -  // When false, the AMF keeps the stock behaviour: ErrorIndic
+          -ation + UEContextReleaseCommand.                              
+      105 +  // [WNC] Fallback for a Service Request without NGAP IE "5G-
+          +S-TMSI": when true, the AMF                                   
+      106 +  // reads the 5G-S-TMSI from NAS IE "5GS mobile identity" in 
+          +the Service Request instead.                                  
+      107 +  // Default false = stock behaviour. See useNasIdentityIfNgap
+          +STmsiMissing in config/amfcfg.yaml.                           
+      108    UseNasIdentityIfNgapSTmsiMissing bool `yaml:"useNasIdentityI
+           fNgapSTmsiMissing,omitempty" valid:"type(bool),optional"`
+      109    // WNC: Controls whether the AMF delivers UE Policy (URSP) t
+           o the UE via the DL NAS
+      110    // Transport "Manage UE Policy Command" after registration. 
+           This gates every delivery
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(NFs/amf/internal/ngap/handler.go)
+  ⎿  Added 5 lines, removed 6 lines
+      476      ran.Log.Infof("5GSMobileIdentity [%q:%q, err: %v]", idType
+           , id, err)
+      477    } else if nasMsgType == nas.MsgTypeServiceRequest &&
+      478      factory.AmfConfig.Configuration.UseNasIdentityIfNgapSTmsiM
+           issing {
+      479 -    // [WNC] The NGAP 5G-S-TMSI IE is missing, but the Service
+          - Request NAS message always                                   
+      480 -    // carries the 5G-S-TMSI in its "5GS mobile identity" fiel
+          -d. Use that field, so the                                     
+      481 -    // AMF can find the stored UE context instead of releasing
+          - the UE.                                                      
+      479 +    // [WNC] Fallback: NGAP IE "5G-S-TMSI" is missing, so read
+          + the 5G-S-TMSI from NAS IE                                    
+      480 +    // "5GS mobile identity" in the Service Request. See useNa
+          +sIdentityIfNgapSTmsiMissing                                   
+      481 +    // in config/amfcfg.yaml.                                 
+      482      id, idType, err = amf_nas.GetNas5GSMobileIdentity(gmmMessa
+           ge)
+      483 -    ranUe.Log.Warnf("[WNC] InitialUEMessage has no NGAP 5G-S-T
+          -MSI IE; using the 5G-S-TMSI from the "+                       
+      484 -      "Service Request NAS message instead [%q:%q, err: %v] (u
+          -seNasIdentityIfNgapSTmsiMissing=true)",                       
+      485 -      idType, id, err)                                        
+      483 +    ranUe.Log.Warnf("[WNC] Service Request without NGAP IE \"5
+          +G-S-TMSI\"; using NAS IE "+                                   
+      484 +      "\"5GS mobile identity\" instead [%q:%q, err: %v]", idTy
+          +pe, id, err)                                                  
+      485    } else {
+      486      // Missing NGAP 5G-S-TMSI IE
+      487      var iesCriticalityDiagnostics ngapType.CriticalityDiagnost
+           icsIEList
+
+● Bash(make amf 2>&1 | tail -2 && cd NFs/amf && gofmt -l internal/ngap
+      internal/gmm internal/context pkg/factory; go vet ./internal/ngap/
+      ./pkg/factory/ && go test ./i…)
+  ⎿  cd NFs/amf/cmd && \
+     CGO_ENABLED=0 go build -gcflags "" -ldflags "-X github.com/free5gc/uti
+     l/version.VERSION=v4.0.1-kk-snap-003-18-g808af53 -X github.com/free5gc
+     … +11 lines (ctrl+o to expand)
+  ⎿  (timeout 5m)
+  ⎿  Found 21 new diagnostic issues in 3 files (ctrl+o to expand)
+
+● Bash(gofmt -d internal/gmm/handler.go internal/context/amf_ue.go
+      internal/gmm/message/send.go | head -40; git stash list | head -1; git
+      diff --stat)
+  ⎿  diff internal/gmm/handler.go.orig internal/gmm/handler.go
+     --- internal/gmm/handler.go.orig
+     +++ internal/gmm/handler.go
+     … +43 lines (ctrl+o to expand)
+
+● The gofmt differences are in older WNC code: blank lines with trailing
+  whitespace at gmm/handler.go:2059 and :2100, and the column alignment of the
+  UePolicy* fields in amf_ue.go. None of today's lines cause them, so I left
+  them unchanged.
+
+  Summary
+
+  Three files changed in this step:
+
+  File (relative to free5gc/): config/amfcfg.yaml
+  Change: Adds useNasIdentityIfNgapSTmsiMissing: true with the detailed comment:
+
+  both IE tables, the MTK UE note and the fallback note
+  ────────────────────────────────────────
+  File (relative to free5gc/): NFs/amf/pkg/factory/config.go
+  Change: Adds the UseNasIdentityIfNgapSTmsiMissing field (bool, default false)
+  with a 3-line comment that points to the YAML
+  ────────────────────────────────────────
+  File (relative to free5gc/): NFs/amf/internal/ngap/handler.go
+  Change: Adds the fallback branch in handleInitialUEMessage, after the NGAP IE
+  branch and the Initial Registration branch
+
+  This fix does not touch the two files from the earlier slice fix
+  (internal/context/amf_ue.go and internal/gmm/handler.go).
+
+  The build, go vet, and the ngap, factory, gmm and context tests all pass
+  locally.
+
+  When you copy config/amfcfg.yaml to the CN, check first whether the CN copy
+  has local changes. If it does, add only the new key and its comment block, so
+  you do not overwrite those changes.
+
+  What the CN log should show after the change
+
+  When the MTK UE sends a Service Request, the log should contain:
+  [WARN][Ngap] [WNC] Service Request without NGAP IE "5G-S-TMSI"; using NAS IE 
+  "5GS mobile identity" instead ["5G-S-TMSI":"fe0000000001", err: <nil>]
+  [INFO][Ngap] find AmfUe ["5G-S-TMSI":"fe0000000001"]
+
+  The log should no longer contain Missing 5G-S-TMSI IE in InitialUEMessage; 
+  send ErrorIndication. The pcap should show the Service Request answered with a
+  Service Accept, not an ErrorIndication.
+
+  ★ Insight ─────────────────────────────────────
+  - The fallback does not weaken NAS security. DecodePlainNasNoIntegrityCheck
+    reads the identity without checking the MAC, but only to find the stored UE
+    context. The GMM layer then checks the Service Request's MAC with that UE's
+    NAS keys. A forged 5G-S-TMSI would find a UE context, and the MAC check
+    would then fail.
+  - The 5G-S-TMSI lookup in findAmfUe builds the full GUTI from
+    servedGuamiList[0] (466-11). That works only because GUTI assignment uses
+    the same first entry. If option 3 is ever done (assigning the GUTI from the
+    UE's own PLMN), findAmfUe must change in the same commit. Otherwise both the
+    NGAP path and the new NAS fallback would stop finding the UE.
+    ─────────────────────────────────────────────────
+
+✻ Cooked for 1m 7s · done 2:54 PM
+
+※ recap: The goal is to stop the CN from releasing the MTK UE when its Service Request lacks the NGAP 5G-S-TMSI. The `useNasIdentityIfNgapSTmsiMissing` fallback is built and passes the local tests. Next, copy the three changed files to the CN, rebuild there, and retest. (disable recaps in /config)
+
+❯ It works.                                                                     
+                                                                                
+  Now new problems:                                                             
+                                                                                
+  Log: /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_lo 
+  gs/test4-apn-internet-cause-error-and-same-apn-without-nssia-will-default-all 
+  ocate-the-first-nssai                                                         
+                                                                                
+  1. APN "internet" cause error                                                 
+                                                                                
+  In /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_logs 
+  /test4-apn-internet-cause-error-and-same-apn-without-nssia-will-default-alloc 
+  ate-the-first-nssai/free5gc/log/console_free5gc.log                           
+  2026-10-07T15:13:04.859832305+08:00␛[36m [INFO][UDR][GIN] ␛[0m| 404 |         
+  127.0.0.1 | GET     | /nudr-dr/v2/policy-data/ues/imsi-310260000013069/sm-dat 
+  a?dnn=internet&snssai=%7B%22sst%22%3A1%2C%22sd%22%3A%220007d0%22%7D |         
+  2026-10-07T15:13:04.860307986+08:00␛[31m [ERRO][PCF][Consumer] ␛[0mopenapi    
+  error: 404, Not Found                                                         
+  2026-10-07T15:13:04.860702079+08:00␛[31m [ERRO][PCF][GIN] ␛[0mpanic: runtime  
+  error: invalid memory address or nil pointer dereference                      
+  goroutine 735 [running]:                                                      
+  runtime/debug.Stack()                                                         
+      /usr/local/go/src/runtime/debug/stack.go:24 +0x5e                         
+  github.com/free5gc/util/logger.NewGinWithLogrus.ginRecover.func2.1()          
+      /root/go/pkg/mod/github.com/free5gc/util@v1.0.6/logger/logger.go:284      
+  +0x117                                                                        
+  panic({0xdf72e0?, 0x16ec030?})                                                
+      /usr/local/go/src/runtime/panic.go:914 +0x21f                             
+  github.com/free5gc/pcf/internal/sbi/processor.(*Processor).HandleCreateSmPoli 
+  cyRequest(_, _, {0x0, 0x0, {0x0, 0x0}, {0xc00077c168, 0x14}, 0x0, {0x0, ...}, 
+  ...})                                                                         
+      /home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/NFs/pcf/internal/sbi 
+  /processor/smpolicy.go:78 +0x52a                                              
+  github.com/free5gc/pcf/internal/sbi.(*Server).HTTPCreateSMPolicy(0xc00052a5e0 
+  , 0xc0006e2000)                                                               
+      /home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/NFs/pcf/internal/sbi 
+  /api_smpolicy.go:83 +0x3a5                                                    
+  github.com/gin-gonic/gin.(*Context).Next(0xc0006e2000)                        
+      /root/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/context.go:174 +0x2b     
+  github.com/free5gc/util/logger.NewGinWithLogrus.ginRecover.func2(0x419d48?)   
+      /root/go/pkg/mod/github.com/free5gc/util@v1.0.6/logger/logger.go:316      
+  +0x57                                                                         
+  github.com/gin-gonic/gin.(*Context).Next(0xc0006e2000)                        
+      /root/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/context.go:174 +0x2b     
+  github.com/free5gc/util/logger.NewGinWithLogrus.ginToLogrus.func1(0xc0006e200 
+  0)                                                                            
+      /root/go/pkg/mod/github.com/free5gc/util@v1.0.6/logger/logger.go:251      
+  +0x5f                                                                         
+  github.com/gin-gonic/gin.(*Context).Next(...)                                 
+      /root/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/context.go:174           
+  github.com/gin-gonic/gin.(*Engine).handleHTTPRequest(0xc000683380,            
+  0xc0006e2000)                                                                 
+      /root/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/gin.go:620 +0x65b        
+  github.com/gin-gonic/gin.(*Engine).ServeHTTP(0xc000683380, {0x1130240?,       
+  0xc000c02018}, 0xc0001b8400)                                                  
+      /root/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/gin.go:576 +0x1dd        
+  golang.org/x/net/http2.(*serverConn).runHandler(0xc0006aa270?, 0xc0006cafd0?, 
+  0x92e1c5?, 0xc000428000?)                                                     
+      /root/go/pkg/mod/golang.org/x/net@v0.33.0/http2/server.go:2475 +0x113     
+  created by golang.org/x/net/http2.(*serverConn).scheduleHandler in goroutine  
+  731                                                                           
+      /root/go/pkg/mod/golang.org/x/net@v0.33.0/http2/server.go:2409 +0x21d     
+  2026-10-07T15:13:04.860852559+08:00␛[36m [INFO][PCF][GIN] ␛[0m| 500 |         
+  127.0.0.1 | POST    | /npcf-smpolicycontrol/v1/sm-policies |                  
+  2026-10-07T15:13:04.861289443+08:00␛[33m [WARN][SMF][SBI] ␛[0mNAS Error       
+  Response: {0xc000b00420 [46 14 11 195 38] []}                                 
+  2026-10-07T15:13:04.861699482+08:00␛[37m                                      
+  [TRAC][SMF][PduSess][pdu_session_id:14][supi:imsi-310260000013069]            
+  ␛[0mState[ActivePending] -> State[InActive]                                   
+  2. When I send PDN request for the same APN but without NSSAI (I already have 
+  other PDN session request with other NSSAI), CN will send PDN session accept  
+  but with the NSSAI (the first NSSAI that has the same apn name)               
+  No. Time    Source  Destination Protocol    Length  Info                      
+  // I didn't carry NSSAI with APN name : fast.t-mobile.com                     
+  7020    15:29:21.994767 192.168.0.184   192.168.0.2 NGAP/NAS-5GS    188       
+  UplinkNASTransport, UL NAS transport, PDU session establishment request       
+  // But free5gc reply accept with NSSAI (The first fast.t-mobile.com's NSSAI,  
+  sd:2000)                                                                      
+  7506    15:29:22.245057 192.168.0.2 192.168.0.184   NGAP/NAS-5GS    292       
+  PDUSessionResourceSetupRequest, DL NAS transport, PDU session establishment   
+  accept                                                                        
+
+● Two separate problems. I start with problem 1. This reads the PCF code at
+  smpolicy.go, around line 78, where the panic happens.
+
+  Read 1 file (ctrl+o to expand)
+
+● Bash(cd
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/udr
+      && grep -rn "func (p \*Processor) PolicyDataUesUeIdSmDataGetProcedure"
+      -A60 intern…)  ⎿  internal/sbi/processor/default.go:271:func (p *Processor) PolicyDataUe
+     sUeIdSmDataGetProcedure(
+     internal/sbi/processor/default.go-272-     c *gin.Context, collName string,
+     … +58 lines (ctrl+o to expand)
+
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_
+      logs/test4-apn-internet-cause-error-and-same-apn-without-nssia-will-defaul
+      t-allocate-th…)
+  ⎿  config
+     log
+     20261007_145708
+     … +122 lines (ctrl+o to expand)
+
+● Bash(cd log/20261007_145708 && ls; tshark -r free5gc.pcap -o
+      nas-5gs.null_decipher:TRUE -Y 'nas-5gs.pdu_session_id == 14 &&
+      nas-5gs.mm.message_type == 0x67' -V 2>/de…)
+  ⎿  free5gc.log
+     free5gc.pcap
+     key
+     … +30 lines (ctrl+o to expand)
+
+● Bash(cd
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/amf
+      && grep -n "func transport5GSMMessage\|SNSSAI ==
+      nil\|ulNasTransport.SNSSAI\|S-NSS…)
+  ⎿  82:func transport5GSMMessage(ue *context.AmfUe, anType models.AccessTy
+     pe,
+     232:       if ulNasTransport.SNSSAI != nil {
+     … +2 lines (ctrl+o to expand)
+
+● This reads handler.go lines 225–290, the branch that sets snssai when the UL
+  NAS Transport has no S-NSSAI.
+
+  Read 1 file (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_
+      logs/test4-apn-internet-cause-error-and-same-apn-without-nssia-will-defaul
+      t-allocate-th…)
+  ⎿  1914:2026-10-07T14:58:51.835551687+08:00 [INFO][AMF][Gmm] RequestedNss
+     ai: &{Iei:47 Len:20 Buffer:[4 1 0 7 208 4 1 0 11 184 4 1 0 0 1 4 1 0 1
+     1 185]}
+     … +41 lines (ctrl+o to expand)
+
+● Summary
+
+  Both problems come from the same line in the AMF. Problem 1 also hits a stock 
+  free5gc bug in the PCF, which turns a "not found" answer into a panic.
+
+  The shared cause: NFs/amf/internal/gmm/handler.go:235-236
+
+  } else {   // UE sent no S-NSSAI in the UL NAS Transport
+      if allowedNssai, ok := ue.AllowedNssai[anType]; ok {
+          snssai = *allowedNssai[0].AllowedSnssai     // ← always the FIRST 
+  allowed slice
+
+  When a PDU Session Establishment Request has no S-NSSAI, the AMF takes the
+  first slice of the UE's Allowed NSSAI. It does not look at the DNN (APN). In
+  this test, the UE's Requested NSSAI was 1/0007D0, 1/000BB8, 1/000001, 1/000BB9
+  (log line 1914). All four are subscribed, so the Allowed NSSAI has the same
+  order, and allowedNssai[0] is 1/0007d0 (SD 2000).
+
+  So the AMF does not choose "the first slice that has the same APN", as it
+  looked from the outside. It chooses SD 2000 for every PDU session without an 
+  S-NSSAI, whatever the APN is:
+
+  ┌────────────────────────┬──────────────┬─────────────────────────────────┐
+  │ APN, no S-NSSAI from   │ Slice chosen │             Result              │
+  │         the UE         │  by the AMF  │                                 │
+  ├────────────────────────┼──────────────┼─────────────────────────────────┤
+  │ fast.t-mobile.com      │              │ Works, because                  │
+  │ (frame 7020)           │ 1/0007d0     │ fast.t-mobile.com happens to be │
+  │                        │              │  provisioned on SD 2000         │
+  ├────────────────────────┼──────────────┼─────────────────────────────────┤
+  │ internet (frame 4231,  │ 1/0007d0     │ Fails, because internet is not  │
+  │ PDU session 14)        │              │ provisioned on SD 2000          │
+  └────────────────────────┴──────────────┴─────────────────────────────────┘
+
+  Problem 1 in detail: APN internet
+
+  1. UDM subscription data. The SMF logs (line 7253) Subscriber data missing PDU
+     session types for DNN[internet] S-NSSAI[sst:1 sd:0007d0]. The free5gc SMF
+     does not reject a DNN that is missing from the subscription. It falls back
+     to smfcfg.yaml and continues.
+  2. UDR policy data. The PCF asks the UDR for the UE's SM policy data (MongoDB
+     policyData.ues.smData) for dnn=internet on slice 1/0007d0. The UDR finds no
+     such entry and answers 404
+     (NFs/udr/internal/sbi/processor/default.go:315).
+  3. PCF panic (stock free5gc bug).
+     NFs/pcf/internal/sbi/processor/smpolicy.go:78 reads response.SmPolicyData
+     before line 79 checks response == nil. After the 404, response is nil, so
+     the PCF panics and answers 500 instead of its "Can't find UE SM Policy Data
+     in UDR" error.
+  4. No answer reaches the UE. The SMF builds a PDU Session Establishment Reject
+     with cause 38 ("network failure"), the bytes [46 14 11 195 38] on log
+     line 7361. It then answers the AMF with 504. On a 504, the AMF only logs
+     CreateSmContextRequest Error (handler.go:273) and does not forward the
+     Reject. The UE retries when its T3580 timer expires, every 16 seconds
+     (frames 4231 → 4577 → 4924).
+
+  Problem 2 in detail: the Accept carries an S-NSSAI the UE did not send
+
+  Putting an S-NSSAI in the Accept is correct. The PDU Session Establishment
+  Accept must tell the UE which slice the session landed on. The problem is
+  which slice the AMF picks. TS 23.502 §4.3.2.2.1 says that when the UE gives no
+  S-NSSAI, the AMF picks a default S-NSSAI "according to the UE subscription,
+  if it contains only one default S-NSSAI, or based on operator policy". This
+  UE's subscription marks 1/000001 as the default (defaultIndication: true, seen
+  in the NSSF query earlier today). The free5gc AMF ignores that mark and takes
+  whichever slice the UE listed first in its Requested NSSAI.
+
+  ★ Insight ─────────────────────────────────────
+  - The AMF already holds the data it needs to choose a slice by DNN.
+    ue.SmfSelectionData.SubscribedSnssaiInfos (fetched from UDM smf-select-data
+    at registration, log line 1995) lists which DNNs each subscribed slice
+    allows. Lines 249–257 use it only to choose a default DNN, never to choose
+    the slice.
+  - smfcfg.yaml lists internet on several slices (lines 34, 70, 102, 134). That
+    is the SMF's own DNN configuration, which is separate from the subscriber
+    data in MongoDB. The SMF config allows internet on SD 2000, but the
+    subscriber data does not. That mismatch is why the failure appears only at
+    the PCF step.
+    ─────────────────────────────────────────────────
+
+  Fix options (nothing changed yet)
+
+  #: A
+  Where: AMF handler.go:235 (config flag, same style as the others)
+  Change: With no S-NSSAI from the UE, walk the Allowed NSSAI and take the first
+
+  slice whose SmfSelectionData lists the requested DNN. If no slice lists the
+  DNN, fall back to the subscription's default slice (1/000001), and then to
+  allowedNssai[0]
+  Effect: Fixes problem 2. Fixes problem 1 too, if internet is subscribed on any
+
+  allowed slice
+  ────────────────────────────────────────
+  #: B
+  Where: PCF smpolicy.go:78
+  Change: Move the line after the nil check (a one-line stock bug fix, so no
+  flag
+  needed)
+  Effect: A missing policy entry returns a clean error instead of a panic and
+  500
+  ────────────────────────────────────────
+  #: C
+  Where: Webconsole subscriber data
+  Change: Provision DNN internet on the slice where it belongs, in both the
+  subscription data and the policy data ("Flow rules")
+  Effect: Removes the 404 for internet
+
+  Option B on its own does not stop the retries. The AMF still drops the SMF's
+  error at handler.go:273, so the UE gets no Reject and keeps retrying every 16
+  seconds.
+
+  Before I start, I need two answers from you:
+  1. Which slice should internet use? I cannot see the MongoDB subscriber data
+     from here. Option A only helps if internet is subscribed on at least one of
+     the UE's allowed slices.
+  2. Which options do you want? My suggestion is A + B. Add C if internet is not
+     yet subscribed on any slice.
+
+✻ Churned for 2m 7s · done 5:13 PM
+
+※ recap: The goal is to make the free5gc CN serve the MTK UE's PDU sessions correctly; I diagnosed the APN "internet" failure and the wrong-slice choice. Next, tell me which slice "internet" belongs on and which fix options (A, B, C) to apply. (disable recaps in /config)
+
+❯ It seems like there is several nssai list that CN can pick? What is the order 
+  that 3gpp spec define?                                                        
+
+● I want to quote the spec rules exactly, not from memory. This search looks up
+  the TS 24.501 and TS 23.502 text for how the AMF picks an S-NSSAI when the UE
+  does not provide one.
+
+● Web Search("3GPP TS 24.501 "S-NSSAI IE is not included" AMF "default S-NSSAI"
+            UL NAS TRANSPORT "allowed NSSAI" subscription")
+  ⎿  Did 5 searches in 34s
+
+● The CN holds several NSSAI lists for one UE. For a PDU session without an
+  S-NSSAI, TS 23.502 lets the AMF pick from only one of them, the Allowed NSSAI,
+  and it fixes the order of the rules.
+
+  The NSSAI lists the CN holds for this UE
+
+  List (spec name): Subscribed S-NSSAIs
+  Who builds it: Operator (webconsole → MongoDB)
+  Where it lives: UDM am-data → nssai (defaultSingleNssais + singleNssais)
+  This UE: Default: 1/000001. Others: 1/0007D0, 1/000BB8, 1/000BB9
+  ────────────────────────────────────────
+  List (spec name): SMF Selection Subscription Data
+  Who builds it: Operator
+  Where it lives: UDM smf-select-data
+  This UE: For each subscribed slice: the allowed DNNs, and which DNN is the
+  default
+  ────────────────────────────────────────
+  List (spec name): Requested NSSAI
+  Who builds it: UE
+  Where it lives: Registration Request
+  This UE: 1/0007D0, 1/000BB8, 1/000001, 1/000BB9 (this test)
+  ────────────────────────────────────────
+  List (spec name): Allowed NSSAI
+  Who builds it: AMF, at registration
+  Where it lives: Registration Accept; ue.AllowedNssai in free5gc
+  This UE: The same 4 slices, in the Requested NSSAI order
+  ────────────────────────────────────────
+  List (spec name): Rejected NSSAI
+  Who builds it: AMF
+  Where it lives: Registration Accept
+  This UE: None in this test
+  ────────────────────────────────────────
+  List (spec name): Configured NSSAI
+  Who builds it: AMF/NSSF
+  Where it lives: Registration Accept
+  This UE: Tells the UE what to request next time
+  ────────────────────────────────────────
+  List (spec name): AMF plmnSupportList, NSSF config
+  Who builds it: Operator
+  Where it lives: amfcfg.yaml, nssfcfg.yaml
+  This UE: The slices the network supports. These are not per-UE lists
+
+  The order TS 23.502 §4.3.2.2.1 defines when the UE sends no S-NSSAI
+
+  1. The AMF picks only from the Allowed NSSAI.
+  2. If the Allowed NSSAI has exactly one S-NSSAI, the AMF uses it.
+  3. If it has more than one, and the UE subscription contains exactly one 
+     default S-NSSAI that is in the Allowed NSSAI, the AMF uses that default
+     S-NSSAI.
+  4. Otherwise, the AMF picks based on operator policy. This is what I remember
+     the clause saying. The search result was cut off before this point, so
+     please check it in your copy of the spec.
+
+  The rule does not mention the DNN. The DNN does not take part in choosing the
+  slice.
+
+  What that means for this UE
+
+  ┌─────────────────────┬───────────────────────────────────────────────────┐
+  │                     │  Slice chosen for a PDU session without S-NSSAI   │
+  ├─────────────────────┼───────────────────────────────────────────────────┤
+  │ Spec (rule 3)       │ 1/000001: the only default S-NSSAI in the         │
+  │                     │ subscription, and it is in the Allowed NSSAI      │
+  ├─────────────────────┼───────────────────────────────────────────────────┤
+  │ free5gc             │ 1/0007d0, because it is allowedNssai[0], the      │
+  │ (handler.go:236)    │ first slice the UE listed in its Requested NSSAI  │
+  └─────────────────────┴───────────────────────────────────────────────────┘
+
+  The free5gc AMF skips rule 3 and uses the list order. That order comes from
+  the UE, so it can change between registrations. Test 2 earlier today had a
+  different Requested NSSAI order.
+
+  ★ Insight ─────────────────────────────────────
+  - This changes my option A from the previous answer. "Choose by DNN first" is
+    not what the spec says when the subscription has exactly one default
+    S-NSSAI. A spec-compliant fix applies rules 2 → 3 → 4, and a DNN-aware
+    choice can appear only at rule 4, as "operator policy".
+  - With the spec order, both of your APNs would go to 1/000001 when the UE
+    sends no S-NSSAI. fast.t-mobile.com would then move off SD 2000. The session
+    works only if both DNNs are provisioned on 1/000001, in the subscription
+    data and in the policy data. Please check that before choosing the fix.
+  - On the UE side, TS 24.526 says the UE normally takes the S-NSSAI from a URSP
+    rule that matches the DNN. This CN delivers URSP
+    (pcfcfg_ue_policy_tmo.yaml). A UE that sends no S-NSSAI means no URSP route
+    selection descriptor gave it one for that DNN. Adding an S-NSSAI to the
+    matching URSP rule would avoid the AMF choice completely.
+    ─────────────────────────────────────────────────
+
+  Tell me which way you want to go:
+  - Option A rewritten to follow the spec (rules 2 → 3 → 4, with allowedNssai[0]
+    kept as the last fallback), behind a config flag.
+  - Option A with a DNN-aware rule 4.
+  - The URSP route (S-NSSAI in the matching URSP rule), which needs no AMF
+    change.
+
+  Sources:
+  - 3GPP TS 23.502 draft S2-2102512r02 (clause 4.3.2.2.1)
+  - GSMA NG.141 – Guidelines for URSP
+  - inside TS 24.501: Network Slicing (tech-invite)
+
+✻ Cooked for 1m 25s · done 5:24 PM
+
+※ recap: Goal: get the MTK UE working on the free5gc CN. The current problem is that a PDU session without an S-NSSAI goes to the wrong slice. Next, you choose how to fix it: a spec-order AMF fix, a DNN-aware AMF fix, or adding the S-NSSAI to the URSP rule.
+
+❯ About:                                                                        
+  4. Otherwise, the AMF picks based on operator policy. This is what I remember 
+  the clause saying. The search result was                                      
+   cut off before this point, so please check it in your copy of the spec.      
+                                                                                
+  I download 3gpp spec in /home/loren/Downloads/ts_123502v190900p.pdf, can you  
+  check again?                                                                  
+
+● This command converts the TS 23.502 PDF you downloaded to text and searches it
+  for the sentence about the AMF picking an S-NSSAI when the NAS message has
+  none.
+
+● Bash(cd /tmp && pdftotext -layout /home/loren/Downloads/ts_123502v190900p.pdf
+      ts23502.txt && grep -n "does not contain an S-NSSAI\|determines an S-NSSAI
+      of the Servi…)
+  ⎿  8972:      If the NAS message does not contain an S-NSSAI, the AMF det
+     ermines an S-NSSAI of the Serving PLMN for
+  ⎿  Shell cwd was reset to 
+     /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc
+
+● This reads the text around line 8972, plus the version header at the top of
+  the file, so I can quote the full clause and confirm it is §4.3.2.2.1.
+
+● Bash(sed -n '1,12p' /tmp/ts23502.txt | grep -v '^\s*$' | head -4; echo ----;
+      grep -n "^4.3.2.2.1\|^ *4.3.2.2.1 " /tmp/ts23502.txt | head -3; echo ----;
+      sed -n '8955,…)
+  ⎿        ETSI TS 123 502 V19.9.0 (2026-09)
+     TECHNICAL SPECIFICATION
+                                 5G;
+     … +56 lines (ctrl+o to expand)
+
+● Rule 4 is confirmed, with one detail I did not have. The same paragraph also
+  covers your problem 1. The text below is from ETSI TS 123 502 V19.9.0 
+  (2026-09), 3GPP Release 19, §4.3.2.2.1 "Non-roaming and Roaming with Local 
+  Breakout", step 2, page 133–134:
+
+  ▎ If the NAS message does not contain an S-NSSAI, the AMF determines an 
+  ▎ S-NSSAI of the Serving PLMN for the requested PDU Session from the current 
+  ▎ Allowed NSSAI for the UE. If there is only one S-NSSAI in the Allowed NSSAI,
+  ▎ this S-NSSAI shall be used. If there is more than one S-NSSAI in the 
+  ▎ Allowed NSSAI, the S-NSSAI selected is either according to the UE 
+  ▎ subscription, if the subscription contains only one default S-NSSAI and the 
+  ▎ corresponding mapped HPLMN S-NSSAI of the Serving PLMN is included in the 
+  ▎ Allowed NSSAI, or based on operator policy (e.g. also ensures any UE 
+  ▎ Requested DNN is allowed for the selected S-NSSAI).
+
+  The order, now confirmed
+
+  Rule: 1
+  Condition: Always
+  S-NSSAI used: Choose only from the Allowed NSSAI
+  ────────────────────────────────────────
+  Rule: 2
+  Condition: Allowed NSSAI has exactly one S-NSSAI
+  S-NSSAI used: That S-NSSAI
+  ────────────────────────────────────────
+  Rule: 3
+  Condition: More than one, and the subscription has exactly one default S-NSSAI
+
+  that is in the Allowed NSSAI
+  S-NSSAI used: That default S-NSSAI
+  ────────────────────────────────────────
+  Rule: 4
+  Condition: Otherwise
+  S-NSSAI used: Operator policy. The spec's example of a policy is one that
+  makes
+  sure the UE's requested DNN is allowed on the chosen S-NSSAI
+
+  The DNN check appears only as an example inside rule 4. Rule 3 does not
+  consider the DNN. For this UE, rule 3 applies (the one default S-NSSAI
+  1/000001 is in the Allowed NSSAI), so the spec result is 1/000001 for both
+  internet and fast.t-mobile.com.
+
+  The same paragraph also covers problem 1
+
+  The sentences that follow say what the AMF must do when the requested DNN is
+  not subscribed on the chosen S-NSSAI:
+
+  ▎ If the AMF cannot select an SMF (e.g. the UE requested DNN is not supported 
+  ▎ by the network, or the UE requested DNN is not in the Subscribed DNN List 
+  ▎ for the S-NSSAI … and wildcard DNN is not included in the Subscribed DNN 
+  ▎ list), the AMF shall, based on operator policies received from PCF, either 
+  ▎ reject the NAS Message containing PDU Session Establishment Request from the
+  ▎ UE with an appropriate cause or request PCF to replace the UE requested DNN
+  ▎ by a selected DNN.
+
+  So under the spec, the internet request on a slice where internet is not
+  subscribed should never reach the SMF and the PCF. The AMF should reject it
+  (or ask the PCF for a DNN replacement). The free5gc AMF does not check the
+  Subscribed DNN List. It sends the request to the SMF, and you get the 404 →
+  PCF panic → 504 chain with no answer to the UE.
+
+  ★ Insight ─────────────────────────────────────
+  - "Subscribed DNN List for the S-NSSAI" is the per-slice DNN list in the SMF 
+    Selection Subscription Data (UDM smf-select-data). The free5gc AMF already
+    loads it into ue.SmfSelectionData.SubscribedSnssaiInfos at registration, so
+    the spec's DNN check needs no new UDM request.
+  - Rules 3 and 4 make the DNN-aware choice legal only when the subscription has
+    zero or several default S-NSSAIs. With one default S-NSSAI, a strict
+    implementation picks it, and then rejects the request if the DNN is not
+    subscribed there. The UE should then retry with an explicit S-NSSAI (from
+    URSP).
+    ─────────────────────────────────────────────────
+
+  Revised fix options
+
+  #: A1
+  Change: AMF slice choice for a request without S-NSSAI follows rules 2 → 3 →
+  4,
+  with allowedNssai[0] as the rule-4 fallback
+  Spec basis: Selection paragraph
+  ────────────────────────────────────────
+  #: A2
+  Change: Optional DNN-aware rule 4: take the first Allowed S-NSSAI whose
+  Subscribed DNN List contains the requested DNN
+  Spec basis: "e.g. also ensures any UE Requested DNN is allowed"
+  ────────────────────────────────────────
+  #: D
+  Change: New: before selecting the SMF, the AMF checks that the requested DNN
+  is
+  in the Subscribed DNN List of the chosen S-NSSAI (or that the list has a
+  wildcard DNN). If not, the AMF rejects the request with a proper 5GMM cause,
+  and the UE gets an answer at once instead of a T3580 retry every 16 s
+  Spec basis: "AMF cannot select an SMF … shall … reject"
+  ────────────────────────────────────────
+  #: B
+  Change: PCF smpolicy.go:78: move the line after the nil check (stock bug)
+  Spec basis: Not spec-related; it stops the panic
+
+  Which of these do you want, and should each one sit behind a config flag like
+  the earlier fixes? Option B is a plain bug fix, so I would not put it behind a
+  flag.
+
+✻ Worked for 36s · done 5:35 PM
+
+❯ But for apn "internet" I do have sst:1 & sd:1 in UE database:                 
+  /home/loren/Downloads/Network_Slice_Unable_to_Establish_Multiple_PDU_Sessions 
+  _with_Same_APN_but_Different_SD.mhtml                                         
+                                                                                
+  It means internet is subscribed, right?                                       
+
+● This command first checks the size and type of the .mhtml file. An MHTML file
+  is a saved web page, usually with quoted-printable encoding, so I check before
+  reading it.
+
+● Bash(F=/home/loren/Downloads/Network_Slice_Unable_to_Establish_Multiple_PDU_Se
+      ssions_with_Same_APN_but_Different_SD.mhtml; ls -la "$F"; grep -c "" "$F";
+      grep -m5 -iE…)
+  ⎿  -rw------- 1 loren loren 1944975 2026-10-06 19:10 /home/loren/Download
+     s/Network_Slice_Unable_to_Establish_Multiple_PDU_Sessions_with_Same_AP
+     N_but_Different_SD.mhtml
+     … +7 lines (ctrl+o to expand)
+
+● Bash(python3 - <<'PY'
+      import email, re, html…)
+  ⎿  180
+     95:A default Internet PDN
+     99:The Internet PDN is established successfully.
+
+● This command prints the whole decoded case text (180 lines), so I can read
+  what the case says about APN internet and the slices.
+
+  Read 1 file (ctrl+o to expand)
+
+● Bash(python3 - <<'PY'
+      import email, re, html…)
+  ⎿  text/html None 277180 https://eservice.mediatek.com/eservice-portal/is
+     sue_manager/update/143414676
+     SOLUTION>> "> Completed Solution 通过在APN名前加特殊字符0x1f（十六进制
+     … +172 lines (ctrl+o to expand)
+● Bash(python3 - <<'PY'
+      import email, re, html…)
+  ⎿  308
+     18:we can see 0x1f is added into the head of apn name and nssai: "sst"
+     : "1","sd": "2000" has been sent to OTA and accept by OTA
+     … +29 lines (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_
+      logs/test4-apn-internet-cause-error-and-same-apn-without-nssia-will-defaul
+      t-allocate-th…)
+  ⎿  14715:15:29:21.996 [INFO][AMF][Gmm][amf_ue_ngap_id:RU:65538,AU:2(3GPP)
+     ][supi:SUPI:imsi-310260000013069] Select SMF [snssai: {Sst:1 Sd:0007d0
+     }, dnn: fast.t-mobile.com]
+     … +57 lines (ctrl+o to expand)
+
+● Yes, if your database has internet on sst:1, sd:000001, then internet is
+  subscribed, but only on slice 1/000001. A DNN is subscribed per slice, not per
+  UE. In this test, every internet request went to a different slice:
+
+  ┌─────────────────────────┬──────────────┬───────────────────┬────────────┐
+  │          Time           │  Slice the   │        DNN        │ UDR policy │
+  │                         │  AMF chose   │                   │   lookup   │
+  ├─────────────────────────┼──────────────┼───────────────────┼────────────┤
+  │ 15:13:04, 15:13:20,     │              │                   │ 404 every  │
+  │ 15:13:36, 15:13:52,     │ 1/0007d0     │ internet          │ time       │
+  │ 15:14:08                │              │                   │            │
+  ├─────────────────────────┼──────────────┼───────────────────┼────────────┤
+  │ 15:05:05, 15:29:21      │ 1/0007d0     │ fast.t-mobile.com │ 200        │
+  ├─────────────────────────┼──────────────┼───────────────────┼────────────┤
+  │ 15:06:03                │ 1/000bb8     │ fast.t-mobile.com │ 200        │
+  ├─────────────────────────┼──────────────┼───────────────────┼────────────┤
+  │ 15:08:42                │ 1/000bb9     │ fast.t-mobile.com │ 200        │
+  └─────────────────────────┴──────────────┴───────────────────┴────────────┘
+
+  The CN never asked about internet on 1/000001 in this log. The UE sent no
+  S-NSSAI, so the AMF took allowedNssai[0] = 1/0007d0, and internet is not
+  subscribed there. Both the UDM subscription data (the SMF warning at
+  15:13:04.801) and the UDR policy data (the 404) confirm that.
+
+  Problem 1 is therefore not missing subscription data. It is the AMF choosing
+  the wrong slice:
+  - Spec rule 3 picks the subscription's one default S-NSSAI, 1/000001. If
+    internet is on 1/000001, the session would have succeeded.
+  - The free5gc rule (allowedNssai[0]) picked 1/0007d0, and the session failed.
+
+  This makes option A1 (follow TS 23.502 rules 2 → 3 → 4) the fix for both
+  problems, provided fast.t-mobile.com is also subscribed on 1/000001. If it is
+  not, a fast.t-mobile.com request without an S-NSSAI would move from SD 2000 to
+  1/000001 and fail there instead.
+
+  About the file Network_Slice_Unable_to_Establish_Multiple_PDU_Sessions_with_Sa
+  me_APN_but_Different_SD.mhtml: it is MediaTek eService case ALPS11605894, and
+  it shows no CN database entry for internet. It does contain one fact that
+  matters here. MTK says the modem reuses an already-active PDU session when the
+  APN name is the same (modem log: URSP reuses "fast.t-mobile.com"(0) with CID 
+  1). A second session with the same APN on a different slice needs the 0x1f
+  prefix on the APN name (\037fast.t-mobile.com). That is UE-side behaviour,
+  separate from the AMF slice choice.
+
+  ★ Insight ─────────────────────────────────────
+  - Subscription data is keyed by slice first, then DNN. In MongoDB,
+    subscriptionData.provisionedData.smData has one document per S-NSSAI with a
+    dnnConfigurations map. policyData.ues.smData →
+    smPolicySnssaiData[slice].smPolicyDnnData[dnn] has the same structure.
+    internet on 000001 says nothing about internet on 0007d0.
+  - You can confirm the database without the webconsole. On the CN, mongosh 
+    free5gc --eval 'db.subscriptionData.provisionedData.smData.find({ueId:"imsi-
+    310260000013069"},{singleNssai:1,"dnnConfigurations":1})' lists every slice
+    with its DNNs. If internet and fast.t-mobile.com both appear under sd: 
+    "000001", option A1 is safe.
+    ─────────────────────────────────────────────────
+
+  Do you want me to implement A1 behind a config flag, and B, the PCF nil check,
+  as a plain bug fix?
+
+✻ Crunched for 1m 13s · done 5:44 PM
+
+❯ yes, implement A1 with a flag and fix B.                                      
+                                                                                
+  I also want to have a clear message when a PDN session request is not carry a 
+  NSSAI.                                                                        
+
+● I will make the changes in this order:
+
+  1. A1: a config flag plus the slice-selection change in the AMF.
+  2. The clear message: the AMF always logs one line when a PDU Session
+     Establishment Request has no S-NSSAI. The line names the slice it chose and
+     which rule chose it, whether the flag is on or off.
+  3. B: the PCF nil check.
+
+  As in the last change, the detailed comment goes into amfcfg.yaml, and
+  config.go, handler.go and the log line stay short.
+
+  First I read the pieces the new code depends on: the SubscribedNssai and
+  InAllowedNssai code in amf_ue.go, and the PCF consumer that returns the 404.
+  That tells me whether the PCF gets the 404 back as pd or as sessionErr.
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs
+      && grep -n "SubscribedNssai \|func (ue \*AmfUe) InAllowedNssai" -A10
+      amf/internal/cont…)
+  ⎿  104:       SubscribedNssai                   []models.SubscribedSnssai
+     105-       AccessAndMobilitySubscriptionData
+     *models.AccessAndMobilitySubscri
+     ptionData
+     … +62 lines (ctrl+o to expand)
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(config/amfcfg.yaml)
+  ⎿  User rejected update to config/amfcfg.yaml
+
+✻ Cogitated for 1m 18s · done 5:56 PM
+
+❯ I don't know the relation between "Allowed List" and "Default List", I assume 
+  they are different?                                                           
+                                                                                
+  That's why I think the name useDefaultSnssaiForPduSession felt wield for me,  
+  becasue we are choose from "Allowed List" not "Default List", right?          
+                                                                                
+  Also "      296 +  #   | The subscription marks exactly one S-NSSAI as        
+  | That default S-NSSAI             |                                          
+  " >> I think you need to be more clear about what is the subscription here.   
+                                                                                
+  Same as "      312 +  # The requested DNN must be subscribed on the picked    
+  S-NSSAI, in both the subscription data                                        
+        313 +  # and the policy data, or the PDU session fails.                 
+                                                                                
+  " >> What is subscription data and what is policy data?                       
+                                                                                
+  Also, please add a index coulmn in the table, it is a "order" table           
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc &&
+      grep -rhoE '"(subscriptionData\.provisionedData\.[A-Za-z]+|policyData\.ues
+      \.[A-Za-z]+)"…)
+  ⎿        2 "policyData.ues.amData"
+           1 "policyData.ues.chargingData"
+           1 "policyData.ues.flowRule"
+     … +22 lines (ctrl+o to expand)
+
+● Your questions
+
+  1. Are the "Allowed" list and the "Default" list different? Yes. They are
+  different kinds of thing, and the "default" one is not really a separate list:
+
+  Name: Subscribed S-NSSAIs
+  What it is: Every slice the UE is entitled to use
+  Who sets it: Operator, in the webconsole
+  Stored in: MongoDB subscriptionData.provisionedData.amData → nssai, which
+  holds
+  2 arrays: defaultSingleNssais and singleNssais
+  ────────────────────────────────────────
+  Name: Default S-NSSAIs
+  What it is: The Subscribed S-NSSAIs in the defaultSingleNssais array. Each one
+
+  is marked "default" (defaultIndication)
+  Who sets it: Operator (the webconsole "default" mark)
+  Stored in: Same document as above
+  ────────────────────────────────────────
+  Name: Allowed NSSAI
+  What it is: The slices the AMF lets the UE use in this registration
+  Who sets it: AMF, at each registration: Requested NSSAI ∩ Subscribed S-NSSAIs
+  ∩
+  AMF-supported slices
+  Stored in: AMF memory only (ue.AllowedNssai); sent to the UE in Registration
+  Accept
+
+  So a default S-NSSAI is a mark on a subscribed slice, and the Allowed NSSAI is
+  a per-registration result. A default S-NSSAI can be in the Allowed NSSAI or
+  not.
+
+  2. Is useDefaultSnssaiForPduSession the wrong name? Yes, you are right. The
+  AMF always picks from the Allowed NSSAI. The default mark only decides which 
+  Allowed S-NSSAI wins. A clearer name is preferSubscribedDefaultInAllowedNssai:
+  "within the Allowed NSSAI, prefer the S-NSSAI that the subscription marks as
+  default".
+
+  3. What is "subscription data", and what is "policy data"? Both live in
+  MongoDB, and each is read by a different NF:
+
+  Name in the comment: Subscription data: DNN list per slice
+  MongoDB collection: subscriptionData.provisionedData.smData
+  Read by: SMF (through UDM)
+  What it holds for each slice: The DNNs allowed on that slice, with PDU session
+
+  types, AMBR and 5QI
+  Missing entry causes: SMF warning Subscriber data missing PDU session types 
+  for
+   DNN[...]
+  ────────────────────────────────────────
+  Name in the comment: Policy data: DNN list per slice
+  MongoDB collection: policyData.ues.smData
+  (smPolicySnssaiData[slice].smPolicyDnnData[dnn])
+  Read by: PCF (through UDR)
+  What it holds for each slice: Policy data for each slice/DNN pair
+  Missing entry causes: UDR 404 → PCF error (today: the panic)
+
+  The webconsole writes both collections when you add a DNN to an S-NSSAI on the
+  subscriber page.
+
+  Revised draft (I will write nothing until you approve)
+
+    # WNC: preferSubscribedDefaultInAllowedNssai selects how the AMF picks the 
+  S-NSSAI for a PDU
+    # Session Establishment Request that carries no S-NSSAI IE. The AMF always 
+  picks from the
+    # Allowed NSSAI. Three different slice lists are involved:
+    #
+    #   | List                   | Meaning                                  | 
+  Source                         |
+    #   |------------------------|------------------------------------------|---
+  -----------------------------|
+    #   | Subscribed S-NSSAIs    | Every slice the UE is entitled to use    | 
+  MongoDB subscriptionData.      |
+    #   |                        |                                          | 
+  provisionedData.amData → nssai |
+    #   | Default S-NSSAIs       | Subscribed S-NSSAIs that the operator    | 
+  Same document, array           |
+    #   |                        | marks as default in the webconsole       | 
+  nssai.defaultSingleNssais      |
+    #   | Allowed NSSAI          | Slices the AMF allows in this            | 
+  AMF, at registration; keeps    |
+    #   |                        | registration                             | 
+  the Requested NSSAI order      |
+    #
+    # TS 23.502 V19.9.0 clause 4.3.2.2.1 step 2 defines this order:
+    #
+    #   | Index | Condition                                           | S-NSSAI 
+  picked                  |
+    #   |-------|-----------------------------------------------------|---------
+  ------------------------|
+    #   | 1     | The Allowed NSSAI has exactly one S-NSSAI           | That 
+  S-NSSAI                    |
+    #   | 2     | Exactly one Default S-NSSAI exists, and that        | That 
+  Default S-NSSAI            |
+    #   |       | S-NSSAI is in the Allowed NSSAI                     |         
+                         |
+    #   | 3     | Otherwise                                           | Operator
+  policy. In this AMF:   |
+    #   |       |                                                     | the 
+  first S-NSSAI in the        |
+    #   |       |                                                     | Allowed 
+  NSSAI                   |
+    #
+    # None of these conditions looks at the DNN.
+    #
+    #   | Value           | Indexes used                                        
+                 |
+    #   |-----------------|-----------------------------------------------------
+  ----------------|
+    #   | false (default) | Stock: always the first S-NSSAI in the Allowed NSSAI
+                 |
+    #   | true            | 1, 2, 3 in order                                    
+                 |
+    #
+    # Example: Allowed NSSAI 1/0007D0, 1/000BB8, 1/000001, 1/000BB9, and 
+  1/000001 is the only
+    # Default S-NSSAI. false picks 1/0007D0 (SD 2000). true picks 1/000001.
+    #
+    # The requested DNN must be listed for the picked S-NSSAI in both MongoDB 
+  collections below,
+    # or the PDU session fails:
+    #
+    #   | Collection                              | Read by           | If the 
+  DNN is missing     |
+    #   |-----------------------------------------|-------------------|---------
+  ------------------|
+    #   | subscriptionData.provisionedData.smData | SMF (through UDM) | SMF 
+  warns, uses smfcfg    |
+    #   | policyData.ues.smData                   | PCF (through UDR) | UDR 404,
+  PCF rejects      |
+    #
+    # For every request without S-NSSAI IE, the AMF logs "[WNC] PDU Session 
+  Establishment Request
+    # without S-NSSAI IE" with the picked S-NSSAI and the index of the condition
+  that picked it.
+    preferSubscribedDefaultInAllowedNssai: true
+
+  Please confirm, or tell me what to change:
+  1. The name preferSubscribedDefaultInAllowedNssai.
+  2. The YAML comment above.
+
+  After that, I will write config.go, amf_ue.go and gmm/handler.go with short
+  comments that point to this YAML, and then fix B in the PCF.
+
+✻ Cogitated for 40s · done 6:01 PM
+
+※ recap: You are fixing the free5gc AMF so that a PDU session request without a slice gets the right S-NSSAI, and fixing the PCF crash. Next, approve or change the flag name `preferSubscribedDefaultInAllowedNssai` and its YAML comment.
+
+❯ OK, I also want you to add "true" match 3gpp spec.                            
+
+● Edit 1 of 5: config/amfcfg.yaml. This edit adds
+  preferSubscribedDefaultInAllowedNssai: true with the approved comment. The
+  flag-value table now also says that true matches TS 23.502 clause 4.3.2.2.1,
+  and that false skips index 2 of that clause.
+
+● Update(config/amfcfg.yaml)
+  ⎿  Added 46 lines
+      286    #   | true            | Read the 5G-S-TMSI from NAS IE "5GS 
+           mobile identity", and use it  |
+      287    #   |                 | to find the stored UE context.      
+                                         |
+      288    useNasIdentityIfNgapSTmsiMissing: true
+      289 +  # WNC: preferSubscribedDefaultInAllowedNssai selects how the
+          + AMF picks the S-NSSAI for a PDU                              
+      290 +  # Session Establishment Request that carries no S-NSSAI IE. 
+          +The AMF always picks from the                                 
+      291 +  # Allowed NSSAI. Three different slice lists are involved:  
+      292 +  #                                                           
+      293 +  #   | List                   | Meaning                      
+          +            | Source                         |                
+      294 +  #   |------------------------|------------------------------
+          +------------|--------------------------------|                
+      295 +  #   | Subscribed S-NSSAIs    | Every slice the UE is entitle
+          +d to use    | MongoDB subscriptionData.      |                
+      296 +  #   |                        |                              
+          +            | provisionedData.amData → nssai |                
+      297 +  #   | Default S-NSSAIs       | Subscribed S-NSSAIs that the 
+          +operator    | Same document, array           |                
+      298 +  #   |                        | marks as default in the webco
+          +nsole       | nssai.defaultSingleNssais      |                
+      299 +  #   | Allowed NSSAI          | Slices the AMF allows in this
+          +            | AMF, at registration; keeps    |                
+      300 +  #   |                        | registration                 
+          +            | the Requested NSSAI order      |                
+      301 +  #                                                           
+      302 +  # TS 23.502 V19.9.0 clause 4.3.2.2.1 step 2 defines this ord
+          +er:                                                           
+      303 +  #                                                           
+      304 +  #   | Index | Condition                                     
+          +      | S-NSSAI picked                  |                     
+      305 +  #   |-------|-----------------------------------------------
+          +------|---------------------------------|                     
+      306 +  #   | 1     | The Allowed NSSAI has exactly one S-NSSAI     
+          +      | That S-NSSAI                    |                     
+      307 +  #   | 2     | Exactly one Default S-NSSAI exists, and that  
+          +      | That Default S-NSSAI            |                     
+      308 +  #   |       | S-NSSAI is in the Allowed NSSAI               
+          +      |                                 |                     
+      309 +  #   | 3     | Otherwise                                     
+          +      | Operator policy. In this AMF:   |                     
+      310 +  #   |       |                                               
+          +      | the first S-NSSAI in the        |                     
+      311 +  #   |       |                                               
+          +      | Allowed NSSAI                   |                     
+      312 +  #                                                           
+      313 +  # None of these conditions looks at the DNN.                
+      314 +  #                                                           
+      315 +  #   | Value           | Indexes used    | Matches TS 23.502 
+          +clause 4.3.2.2.1?                   |                         
+      316 +  #   |-----------------|-----------------|-------------------
+          +------------------------------------|                         
+      317 +  #   | false (default) | 1, 3            | No: skips index 2.
+          + Stock free5gc behaviour: always    |                         
+      318 +  #   |                 |                 | the first S-NSSAI 
+          +in the Allowed NSSAI                |                         
+      319 +  #   | true            | 1, 2, 3 in order| Yes               
+          +                                    |                         
+      320 +  #                                                           
+      321 +  # Example: Allowed NSSAI 1/0007D0, 1/000BB8, 1/000001, 1/000
+          +BB9, and 1/000001 is the only                                 
+      322 +  # Default S-NSSAI. false picks 1/0007D0 (SD 2000). true pick
+          +s 1/000001.                                                   
+      323 +  #                                                           
+      324 +  # The requested DNN must be listed for the picked S-NSSAI in
+          + both MongoDB collections below,                              
+      325 +  # or the PDU session fails:                                 
+      326 +  #                                                           
+      327 +  #   | Collection                              | Read by     
+          +      | If the DNN is missing     |                           
+      328 +  #   |-----------------------------------------|-------------
+          +------|---------------------------|                           
+      329 +  #   | subscriptionData.provisionedData.smData | SMF (through
+          + UDM) | SMF warns, uses smfcfg    |                           
+      330 +  #   | policyData.ues.smData                   | PCF (through
+          + UDR) | UDR 404, PCF rejects      |                           
+      331 +  #                                                           
+      332 +  # For every request without S-NSSAI IE, the AMF logs "[WNC] 
+          +PDU Session Establishment Request                             
+      333 +  # without S-NSSAI IE" with the picked S-NSSAI and the index 
+          +of the condition that picked it.                              
+      334 +  preferSubscribedDefaultInAllowedNssai: true                 
+      335    # WNC: master switch for UE Policy (URSP) delivery to the UE
+            via the DL NAS Transport
+      336    # "Manage UE Policy Command" after registration. Gates all d
+           elivery paths (PCF 3GPP flow,
+      337    # legacy TriggerUEPolicyDelivery, and PCF-notification SendU
+           EPolicyToUE). Omit the field to
+
+● Update(NFs/amf/pkg/factory/config.go)
+  ⎿  Added 5 lines
+      106    // reads the 5G-S-TMSI from NAS IE "5GS mobile identity" in 
+           the Service Request instead.
+      107    // Default false = stock behaviour. See useNasIdentityIfNgap
+           STmsiMissing in config/amfcfg.yaml.
+      108    UseNasIdentityIfNgapSTmsiMissing bool `yaml:"useNasIdentityI
+           fNgapSTmsiMissing,omitempty" valid:"type(bool),optional"`
+      109 +  // [WNC] For a PDU Session Establishment Request without S-N
+          +SSAI IE: when true, prefer the                                
+      110 +  // only Default S-NSSAI if it is in the Allowed NSSAI (TS 23
+          +.502 clause 4.3.2.2.1). Default                               
+      111 +  // false = stock: the first Allowed S-NSSAI. See preferSubsc
+          +ribedDefaultInAllowedNssai in                                 
+      112 +  // config/amfcfg.yaml.                                      
+      113 +  PreferSubscribedDefaultInAllowedNssai bool `yaml:"preferSubs
+          +cribedDefaultInAllowedNssai,omitempty" valid:"type(bool),optio
+          +nal"`                                                         
+      114    // WNC: Controls whether the AMF delivers UE Policy (URSP) t
+           o the UE via the DL NAS
+      115    // Transport "Manage UE Policy Command" after registration. 
+           This gates every delivery
+      116    // path: the 3GPP PCF flow (UEPolicyControlCreate -> PCF -> 
+           N1N2 transparent forward),
+
+● Update(NFs/amf/internal/context/amf_ue.go)
+  ⎿  Added 19 lines
+      525    return false
+      526  }
+      527  
+      528 +// [WNC] SingleDefaultSubscribedSnssai returns the Default S-N
+          +SSAI when the subscription marks                              
+      529 +// exactly one Subscribed S-NSSAI as default. It returns false
+          + for zero or several.                                         
+      530 +func (ue *AmfUe) SingleDefaultSubscribedSnssai() (models.Snssa
+          +i, bool) {                                                    
+      531 +  var defaultSnssai *models.Snssai                            
+      532 +  for _, subscribedSnssai := range ue.SubscribedNssai {       
+      533 +    if !subscribedSnssai.DefaultIndication || subscribedSnssai
+          +.SubscribedSnssai == nil {                                    
+      534 +      continue                                                
+      535 +    }                                                         
+      536 +    if defaultSnssai != nil {                                 
+      537 +      return models.Snssai{}, false                           
+      538 +    }                                                         
+      539 +    defaultSnssai = subscribedSnssai.SubscribedSnssai         
+      540 +  }                                                           
+      541 +  if defaultSnssai == nil {                                   
+      542 +    return models.Snssai{}, false                             
+      543 +  }                                                           
+      544 +  return *defaultSnssai, true                                 
+      545 +}                                                             
+      546 +                                                              
+      547  // [WNC] AddRejectedNssaiInTa records an S-NSSAI that the Regi
+           stration Accept must
+      548  // reject with cause #1 "S-NSSAI not available in the current 
+           registration area"
+      549  // (nasConvert.RejectedNssaiToNas encodes RejectedNssaiInTa wi
+           th that cause).
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Update(NFs/amf/internal/gmm/handler.go)
+  ⎿  Added 19 lines
+      215    return nil
+      216  }
+      217  
+      218 +// [WNC] selectSnssaiWithoutSnssaiIe picks the S-NSSAI for a P
+          +DU Session Establishment Request                              
+      219 +// without S-NSSAI IE. It returns the S-NSSAI, the index of th
+          +e condition that picked it, and that                          
+      220 +// condition as text. See preferSubscribedDefaultInAllowedNssa
+          +i in config/amfcfg.yaml.                                      
+      221 +func selectSnssaiWithoutSnssaiIe(ue *context.AmfUe, anType mod
+          +els.AccessType) (models.Snssai, int, string, error) {         
+      222 +  allowedNssai := ue.AllowedNssai[anType]                     
+      223 +  if len(allowedNssai) == 0 {                                 
+      224 +    return models.Snssai{}, 0, "", errors.New("Ue doesn't have
+          + allowedNssai")                                               
+      225 +  }                                                           
+      226 +  if len(allowedNssai) == 1 {                                 
+      227 +    return *allowedNssai[0].AllowedSnssai, 1, "the Allowed NSS
+          +AI has exactly one S-NSSAI", nil                              
+      228 +  }                                                           
+      229 +  if factory.AmfConfig.Configuration.PreferSubscribedDefaultIn
+          +AllowedNssai {                                                
+      230 +    if defaultSnssai, ok := ue.SingleDefaultSubscribedSnssai()
+          +; ok && ue.InAllowedNssai(defaultSnssai, anType) {            
+      231 +      return defaultSnssai, 2, "the only Default S-NSSAI is in
+          + the Allowed NSSAI", nil                                      
+      232 +    }                                                         
+      233 +  }                                                           
+      234 +  return *allowedNssai[0].AllowedSnssai, 3, "the first S-NSSAI
+          + in the Allowed NSSAI", nil                                   
+      235 +}                                                             
+      236 +                                                              
+      237  func CreatePDUSession(ulNasTransport *nasMessage.ULNASTranspor
+           t,
+      238    ue *context.AmfUe,
+      239    anType models.AccessType,
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Update(NFs/amf/internal/gmm/handler.go)
+  ⎿  Added 6 lines, removed 4 lines
+      248  
+      249    // If the S-NSSAI IE is not included and the user's subscrip
+           tion context obtained from UDM. AMF shall
+      250    // select a default snssai
+      251 +  var snssaiIndex int                                         
+      252 +  var snssaiReason string                                     
+      253    if ulNasTransport.SNSSAI != nil {
+      254      snssai = nasConvert.SnssaiToModels(ulNasTransport.SNSSAI)
+      255    } else {
+      254 -    if allowedNssai, ok := ue.AllowedNssai[anType]; ok {      
+      255 -      snssai = *allowedNssai[0].AllowedSnssai                 
+      256 -    } else {                                                  
+      257 -      return false, errors.New("Ue doesn't have allowedNssai")
+      256 +    var errSelect error                                       
+      257 +    snssai, snssaiIndex, snssaiReason, errSelect = selectSnssa
+          +iWithoutSnssaiIe(ue, anType)                                  
+      258 +    if errSelect != nil {                                     
+      259 +      return false, errSelect                                 
+      260      }
+      261    }
+      262  
+
+● Update(NFs/amf/internal/gmm/handler.go)
+  ⎿  Added 12 lines
+      279      }
+      280    }
+      281  
+      282 +  if ulNasTransport.SNSSAI == nil {                           
+      283 +    dnnSource := "from the UE"                                
+      284 +    if ulNasTransport.DNN == nil {                            
+      285 +      dnnSource = "picked by the AMF"                         
+      286 +    }                                                         
+      287 +    ue.GmmLog.Warnf("[WNC] PDU Session Establishment Request w
+          +ithout S-NSSAI IE "+                                          
+      288 +      "[PDU session ID: %d, DNN: %q %s]: AMF picked S-NSSAI [S
+          +ST:%d SD:%s] by index %d: %s "+                               
+      289 +      "(preferSubscribedDefaultInAllowedNssai=%t)",           
+      290 +      pduSessionID, dnn, dnnSource, snssai.Sst, snssai.Sd, sns
+          +saiIndex, snssaiReason,                                       
+      291 +      factory.AmfConfig.Configuration.PreferSubscribedDefaultI
+          +nAllowedNssai)                                                
+      292 +  }                                                           
+      293 +                                                              
+      294    if newSmContext, cause, errSelectSmf := consumer.GetConsumer
+           ().SelectSmf(
+      295      ue, anType, pduSessionID, snssai, dnn); errSelectSmf != ni
+           l {
+      296      ue.GmmLog.Errorf("Select SMF failed: %+v", errSelectSmf)
+
+● Update(NFs/pcf/internal/sbi/processor/smpolicy.go)
+  ⎿  Added 7 lines, removed 5 lines
+      75        request.SliceInfo,
+      76        request.Dnn,
+      77      )
+      78 -    smData = response.SmPolicyData                             
+      79 -    if sessionErr != nil || response == nil {                  
+      78 +    // [WNC] Check pd and response before reading response.SmPo
+         +licyData. The stock code read it                               
+      79 +    // first and panicked with a nil pointer when the UDR answe
+         +red 404 (response == nil).                                     
+      80 +    if pd != nil {                                             
+      81 +      c.JSON(int(pd.Status), pd)                               
+      82 +      return                                                   
+      83 +    } else if sessionErr != nil || response == nil {           
+      84        problemDetail := util.GetProblemDetail("Can't find UE SM 
+          Policy Data in UDR", util.USER_UNKNOWN)
+      85        logger.SmPolicyLog.Warnf("Can't find UE[%s] SM Policy Dat
+          a in UDR", ue.Supi)
+      86        c.JSON(int(problemDetail.Status), problemDetail)
+      87        return
+      84 -    } else if pd != nil {                                      
+      85 -      c.JSON(int(pd.Status), pd)                               
+      86 -      return                                                   
+      88      }
+      89 +    smData = response.SmPolicyData                             
+      90      // TODO: subscribe to UDR
+      91    } else {
+      92      smData = *smPolicyData.SmPolicyData
+
+● Bash(make amf pcf 2>&1 | grep -E "error|Error|Start building|\.go:" | head;
+      (cd NFs/amf && go vet ./internal/gmm/ ./internal/context/ ./pkg/factory/
+      && go test ./int…)  ⎿  Start building amf....
+     Start building pcf....
+     ok         github.com/free5gc/amf/internal/gmm     0.006s
+     … +5 lines (ctrl+o to expand)
+  ⎿  (timeout 6m 40s)
+  ⎿  Found 30 new diagnostic issues in 3 files (ctrl+o to expand)
+
+● Bash(ls -l --time-style=+%H:%M:%S bin/amf bin/pcf | awk '{print $6, $7}'; date
+      +%H:%M:%S; gofmt -l NFs/pcf/internal/sbi/processor/smpolicy.go
+      NFs/amf/pkg/factory/con…)
+  ⎿  18:12:10 bin/amf
+     18:12:13 bin/pcf
+     18:12:31
+     … +11 lines (ctrl+o to expand)
+
+● A1, the new log message and B are all in place. Both binaries were rebuilt
+  (bin/amf 18:12:10, bin/pcf 18:12:13), go vet passes, the AMF tests pass, and
+  the new lines are gofmt-clean.
+
+  Files to copy to the CN
+
+  ┌──────────────────────────────────────┬──────────────────────────────────┐
+  │     File (relative to free5gc/)      │              Change              │
+  ├──────────────────────────────────────┼──────────────────────────────────┤
+  │                                      │ New preferSubscribedDefaultInAll │
+  │ config/amfcfg.yaml                   │ owedNssai: true with the         │
+  │                                      │ detailed comment and tables      │
+  ├──────────────────────────────────────┼──────────────────────────────────┤
+  │ NFs/amf/pkg/factory/config.go        │ New PreferSubscribedDefaultInAll │
+  │                                      │ owedNssai field (default false)  │
+  ├──────────────────────────────────────┼──────────────────────────────────┤
+  │                                      │ New                              │
+  │ NFs/amf/internal/context/amf_ue.go   │ SingleDefaultSubscribedSnssai    │
+  │                                      │ method                           │
+  ├──────────────────────────────────────┼──────────────────────────────────┤
+  │                                      │ New selectSnssaiWithoutSnssaiIe  │
+  │ NFs/amf/internal/gmm/handler.go      │ helper; CreatePDUSession calls   │
+  │                                      │ it and logs the [WNC] line       │
+  ├──────────────────────────────────────┼──────────────────────────────────┤
+  │ NFs/pcf/internal/sbi/processor/smpol │ Fix B: check pd, then nil, then  │
+  │ icy.go                               │ read response.SmPolicyData       │
+  └──────────────────────────────────────┴──────────────────────────────────┘
+
+  amf_ue.go, gmm/handler.go and config.go also contain the earlier changes from
+  today. Copying the whole files is fine. As before, if the CN's amfcfg.yaml has
+  local changes, add only the new key and its comment block. After copying, run
+  make amf pcf on the CN.
+
+  The internal/policy/ue_policy_tmobile_test.go changes in both NFs/amf and
+  NFs/pcf were there before this session. They are not part of this change.
+
+  What the CN log should show
+
+  A PDU Session Establishment Request for internet without an S-NSSAI, with the
+  flag on:
+  [WARN][AMF][Gmm] [WNC] PDU Session Establishment Request without S-NSSAI IE 
+  [PDU session ID: 14, DNN: "internet" from the UE]: AMF picked S-NSSAI [SST:1 
+  SD:000001] by index 2: the only Default S-NSSAI is in the Allowed NSSAI 
+  (preferSubscribedDefaultInAllowedNssai=true)
+  [INFO][AMF][Gmm] Select SMF [snssai: {Sst:1 Sd:000001}, dnn: internet]
+
+  If the PCF still cannot find policy data for a slice/DNN pair, it now logs
+  Can't find UE[imsi-...] SM Policy Data in UDR and answers 404 instead of
+  panicking.
+
+  ★ Insight ─────────────────────────────────────
+  - Fix B stops the panic, but it may not make the UE get an answer. With the
+    old 500, the SMF answered the AMF with 504, and the AMF only logs a 504
+    (gmm/handler.go, CreateSmContextRequest Error) without forwarding the SMF's
+    PDU Session Establishment Reject. I have not checked whether the SMF answers
+    the AMF differently for a clean 404 from the PCF. If the UE still retries
+    every 16 seconds (T3580), that AMF path is the next place to look.
+  - With the flag on, fast.t-mobile.com without an S-NSSAI also moves from SD
+    2000 to 1/000001. Check that fast.t-mobile.com is listed under 1/000001 in
+    both subscriptionData.provisionedData.smData and policyData.ues.smData.
+  - The new struct tag line in config.go is 129 characters, over the
+    120-character limit in free5gc/.golangci.yml. The neighbouring
+    AllowedNssaiMode line is already about 140 characters, so I kept the same
+    style. Tell me if you want the tag split.
+    ─────────────────────────────────────────────────
+
+✻ Crunched for 1m 58s · done 6:12 PM
+
+※ recap: Goal: get the MTK UE's PDU sessions working on the free5gc CN. The S-NSSAI selection fix (A1, behind a flag), the new log line and the PCF crash fix are built locally. Next, copy the five changed files to the CN and run `make amf pcf`.

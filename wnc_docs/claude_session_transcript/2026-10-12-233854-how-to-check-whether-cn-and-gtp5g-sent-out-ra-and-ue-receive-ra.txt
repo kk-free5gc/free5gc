@@ -1,0 +1,602 @@
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/smf
+
+
+❯ I don't think my CN is sending out RA, should I give you free5gc logs or      
+  gtp5g logs?                                                                   
+
+● Reading the saved note about the earlier IPv6 SLAAC fix, to see where the
+  Router Advertisement is generated in this setup.
+
+  Recalled 1 memory (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc;
+      grep -rniE "RouterAdvert|ICMPv6TypeRouter|router_advert|sendRA|BuildRA"
+      NFs/smf --include…)
+  ⎿  NFs/smf/internal/context/upf_ra_client.go
+     NFs/smf/internal/context/router_advertisement.go
+     NFs/smf/pkg/factory/config.go
+     … +72 lines (ctrl+o to expand)
+
+● The RA is built in the SMF and handed to the UPF, and gtp5g has its own RA
+  handler (genl_ra.c). I'm reading the SMF client to see how the RA travels from
+  the SMF to gtp5g and what each side logs.
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc;
+      grep -nE "func |Log\.|logger\.|Infof|Errorf|Warnf"
+      NFs/smf/internal/context/upf_ra_client…)
+  ⎿  32:func sendRouterAdvertisementViaHTTPClient(upfHTTPEndpoint string, s
+     eid uint64, pdrID uint16, raPacket []byte) error {
+     34:                return fmt.Errorf("WNC: UPF HTTP endpoint is empty")
+     … +40 lines (ctrl+o to expand)
+
+● Send the free5gc logs first, the SMF lines in particular. The RA is created in
+  the SMF. gtp5g only sends out an RA that it has been given, so the SMF log
+  shows how far the RA got before it stopped.
+
+  In this setup the RA goes through four steps:
+
+  1. The SMF builds the RA in NFs/smf/internal/context/router_advertisement.go.
+  2. The SMF sends it over HTTP to the UPF (sendRouterAdvertisementViaHTTPClient
+     in NFs/smf/internal/context/upf_ra_client.go).
+  3. The UPF passes the RA to gtp5g through a netlink call (netlink is the Linux
+     channel between a program and a kernel module). gtp5g handles it in
+     gtp5g_genl_inject_ra (gtp5g/src/genl/genl_ra.c:35).
+  4. gtp5g wraps the RA in GTP-U and sends it down the tunnel to the gNB and the
+     UE.
+
+  The SMF logs every outcome of steps 2 and 3. If gtp5g rejects the RA, the UPF
+  sends gtp5g's error text back to the SMF, and the SMF writes that text to its
+  own log. So the free5gc log shows where the RA stopped, even when gtp5g is the
+  part that failed.
+
+  On the CN, run this against the log that run_free5gc writes:
+  grep -E "WNC: (Sending RA|RA successfully|UPF RA injection failed|UPF returned
+  error|HTTP request failed)" 
+  /home/wnc/Downloads/free5gc_$free5gc_ver/free5gc/log/console_free5gc.log | 
+  tail -20
+  Paste the output here. What it shows:
+  - No lines at all: the SMF never tried to send an RA, so the fault is in the
+    SMF.
+  - UPF RA injection failed or UPF returned error: the text after it names the
+    cause.
+  - RA successfully injected: the RA left the CN. Only in this case are the
+    gtp5g logs needed: dmesg | grep -i "RA ", plus a capture on the CN with
+    tshark -i any -f "udp port 2152" -Y "icmpv6.type == 134" (134 is the ICMPv6
+    type number for an RA).
+
+  One check to run now, because the CN rebooted today onto a new kernel. gtp5g
+  refuses every RA unless it was loaded with ipv6_data_path=1. In that case it
+  logs RA injection rejected - ipv6_data_path=0 (genl_ra.c:50). Your run_free5gc
+  passes this option. If gtp5g was loaded some other way after the reboot, for
+  example by modprobe gtp5g, the option is off. Check it with:
+  cat /sys/module/gtp5g/parameters/ipv6_data_path
+  The output must be Y. Also confirm that sysctl net.ipv6.conf.all.forwarding
+  prints 1. That setting does not affect the RA, but IPv6 data cannot pass
+  through the UPF without it.
+
+  ★ Insight ─────────────────────────────────────
+  - In this setup, the UE's SLAAC address depends on the RA. The UE builds its
+    IPv6 address from the /64 prefix in the RA. Without an RA, the UE has only a
+    link-local address. This can look like a data-path problem even when the
+    PDRs are correct (a PDR is a gtp5g rule that matches a packet to a tunnel).
+  - The SMF creates the RA, and gtp5g only sends it. That is why the SMF log
+    should be read first.
+    ─────────────────────────────────────────────────
+
+✻ Sautéed for 34s · done 9:13 PM
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]# grep -E "WNC: (Sending RA|RA             
+  successfully|UPF RA injection failed|UPF returned error|HTTP request failed)" 
+  /home/wnc/Downloads/free5gc_$free5gc_ver/free5gc/log/console_free5gc.log |    
+  tail -20                                                                      
+  2026-10-12T20:43:59.547567755+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:3][supi:imsi-310260000013069] WNC:        
+  Sending RA to UPF via HTTP (endpoint=http://5.5.5.2:8080, SEID=1, PDR_ID=5)   
+  2026-10-12T20:43:59.547620563+08:00 [INFO][SMF][PFCP] WNC: Sending RA to UPF  
+  via HTTP (endpoint=http://5.5.5.2:8080, SEID=1, PDR_ID=5, packet_len=88)      
+  2026-10-12T20:43:59.548704742+08:00 [INFO][SMF][PFCP] WNC: RA successfully    
+  injected via UPF (SEID=1, PDR_ID=5): WNC: RA packet injected successfully     
+  2026-10-12T20:43:59.548781055+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:3][supi:imsi-310260000013069] WNC: RA     
+  successfully sent to UPF via HTTP                                             
+  2026-10-12T20:44:00.867448169+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:5][supi:imsi-310260000013069] WNC:        
+  Sending RA to UPF via HTTP (endpoint=http://5.5.5.2:8080, SEID=2, PDR_ID=8)   
+  2026-10-12T20:44:00.867484448+08:00 [INFO][SMF][PFCP] WNC: Sending RA to UPF  
+  via HTTP (endpoint=http://5.5.5.2:8080, SEID=2, PDR_ID=8, packet_len=88)      
+  2026-10-12T20:44:00.868435969+08:00 [INFO][SMF][PFCP] WNC: RA successfully    
+  injected via UPF (SEID=2, PDR_ID=8): WNC: RA packet injected successfully     
+  2026-10-12T20:44:00.868500755+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:5][supi:imsi-310260000013069] WNC: RA     
+  successfully sent to UPF via HTTP                                             
+  2026-10-12T20:44:02.155304346+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:7][supi:imsi-310260000013069] WNC:        
+  Sending RA to UPF via HTTP (endpoint=http://5.5.5.2:8080, SEID=3, PDR_ID=11)  
+  2026-10-12T20:44:02.155354840+08:00 [INFO][SMF][PFCP] WNC: Sending RA to UPF  
+  via HTTP (endpoint=http://5.5.5.2:8080, SEID=3, PDR_ID=11, packet_len=88)     
+  2026-10-12T20:44:02.156447906+08:00 [INFO][SMF][PFCP] WNC: RA successfully    
+  injected via UPF (SEID=3, PDR_ID=11): WNC: RA packet injected successfully    
+  2026-10-12T20:44:02.156514372+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:7][supi:imsi-310260000013069] WNC: RA     
+  successfully sent to UPF via HTTP                                             
+  2026-10-12T20:53:38.047428064+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:9][supi:imsi-310260000013069] WNC:        
+  Sending RA to UPF via HTTP (endpoint=http://5.5.5.2:8080, SEID=2, PDR_ID=14)  
+  2026-10-12T20:53:38.047464134+08:00 [INFO][SMF][PFCP] WNC: Sending RA to UPF  
+  via HTTP (endpoint=http://5.5.5.2:8080, SEID=2, PDR_ID=14, packet_len=88)     
+  2026-10-12T20:53:38.049332437+08:00 [INFO][SMF][PFCP] WNC: RA successfully    
+  injected via UPF (SEID=2, PDR_ID=14): WNC: RA packet injected successfully    
+  2026-10-12T20:53:38.049398394+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:9][supi:imsi-310260000013069] WNC: RA     
+  successfully sent to UPF via HTTP                                             
+  2026-10-12T21:10:36.114875805+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:11][supi:imsi-310260000013069] WNC:       
+  Sending RA to UPF via HTTP (endpoint=http://5.5.5.2:8080, SEID=2, PDR_ID=17)  
+  2026-10-12T21:10:36.114911890+08:00 [INFO][SMF][PFCP] WNC: Sending RA to UPF  
+  via HTTP (endpoint=http://5.5.5.2:8080, SEID=2, PDR_ID=17, packet_len=88)     
+  2026-10-12T21:10:36.116162905+08:00 [INFO][SMF][PFCP] WNC: RA successfully    
+  injected via UPF (SEID=2, PDR_ID=17): WNC: RA packet injected successfully    
+  2026-10-12T21:10:36.116223210+08:00                                           
+  [INFO][SMF][PduSess][pdu_session_id:11][supi:imsi-310260000013069] WNC: RA    
+  successfully sent to UPF via HTTP                                             
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+
+● The SMF log shows all five RAs reached gtp5g, and gtp5g accepted each one. So
+  the RA does leave the SMF. The next question is when the SMF sends the RA,
+  because an RA sent before the gNB has given its downlink tunnel address has
+  nowhere to go. I'm finding the place where the SMF triggers the RA.
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs
+      /smf; grep -rnE
+      "sendRouterAdvertisement|SendRouterAdvertisement|SendRA|sendRA" --inclu…)
+  ⎿  internal/context/sm_context.go:1678:               if err := smContext.SendRouterAdve
+     rtisement(raPacket); err != nil {
+     internal/context/sm_context.go:1687:// WNC: SendRouterAdvertisement se
+     … +13 lines (ctrl+o to expand)
+
+
+● Reading the function around line 1678 to see what triggers the RA, and whether
+  the RA is sent once or repeated.
+
+  Read 1 file (ctrl+o to expand)
+
+● The free5gc logs say the SMF and gtp5g both did their part. The problem is
+  after that point, so gtp5g and capture on the wire are the next things to
+  check.
+
+  What the SMF log shows:
+  - The SMF does not send an RA when a PDU session is set up. It sends one only
+    in reply to a Router Solicitation (RS), which is the message a UE sends to
+    ask for an RA. The trigger is the Router Solicitation event received branch
+    at NFs/smf/internal/context/sm_context.go:1630.
+  - Each of your five PDU sessions has a Sending RA line. That means the UE's RS
+    crossed the uplink tunnel to the UPF, and gtp5g reported it to the SMF. The
+    uplink works.
+  - The SMF built each RA and sent it to the UPF. gtp5g replied RA packet 
+    injected successfully, so gtp5g found the downlink PDR and accepted the
+    packet.
+  - So each RA is lost somewhere between gtp5g on the CN and the IPv6 stack on
+    the UE.
+
+  One more fact matters here. The SMF sends the RA unicast to the UE's
+  link-local address, fe80:: plus the interface ID that the SMF itself assigned
+  (sm_context.go:1658-1665). If the UE's real link-local address uses a
+  different interface ID, the UE drops the RA even if the RA arrives. The
+  capture below will show whether that is happening.
+
+  Next step: on the CN, start these three things, then set up one new IPv6 PDU 
+  session on the UE.
+
+  1. Turn up gtp5g logging so that the Injecting RA ... UE=<address> line is
+     printed. That line is a GTP5G_INF message, and it needs debug level 3 or
+     higher. Write down the current level so you can set it back afterwards:
+  cat /proc/gtp5g/dbg
+  echo 3 > /proc/gtp5g/dbg
+  2. Capture the RS and the RA on the N3 interface (the GTP-U link between the
+     UPF and the gNB). In the ICMPv6 filter, 133 is an RS and 134 is an RA:
+  tshark -i any -f "udp port 2152" -Y "icmpv6.type == 133 || icmpv6.type == 134"
+  -V | grep -E "^Frame|Source Address|Destination Address|Tunnel Endpoint|Type:
+  Router|Prefix:"
+  3. After the session comes up, read the gtp5g lines:
+  dmesg | grep -E "Injecting RA|RA packet injected|RA injection"
+
+  How to read the results:
+  - No RA (type 134) in the tshark output: gtp5g accepted the RA but never sent
+    it on N3. The fault is inside gtp5g's forwarding path.
+  - An RA goes out with the right tunnel endpoint ID (TEID) and the right gNB 
+    address: the CN did its job. Then compare the RA's destination address with
+    the source address of the UE's RS. If they differ, the UE is dropping the RA
+    because the link-local addresses don't match. On the UE you can confirm
+    this with ip -6 addr show rmnet_data0, which lists the UE's own fe80::
+    address.
+
+  Paste the tshark and dmesg output here.
+
+  ★ Insight ─────────────────────────────────────
+  - Because the SMF answers an RS, a Sending RA line proves two things: the
+    uplink tunnel works, and gtp5g's RS-matching rule (the ll_match path in
+    pdr_find_by_gtp1u) works. So the search is now limited to the downlink path.
+  - The text RA packet injected successfully only means gtp5g handed the packet
+    to its forwarding code. It does not prove that the packet left the CN, so
+    the capture on N3 is needed.
+    ─────────────────────────────────────────────────
+
+✻ Sautéed for 36s · done 9:15 PM
+
+※ recap: You're finding out why the UE gets no IPv6 Router Advertisement: the free5gc logs show the CN builds and hands off each one. Next, run the gtp5g dmesg command and the tshark capture on the CN while bringing up a new PDU session, then paste the output. (disable recaps in /config)
+
+❯ I restart free5gc and set debug level to gtp5g =3:                            
+                                                                                
+  Here is the UE's IP:                                                          
+  ~ #   ifconfig | grep -A3 ccmni                                               
+  ccmni1    Link encap:Ethernet  HWaddr AE:62:F8:12:72:5D                       
+            inet addr:10.121.0.2  Bcast:10.121.0.7  Mask:255.255.255.248        
+            inet6 addr: fe80::2/128 Scope:Link                                  
+            inet6 addr: 2001:db8:121:1::2/64 Scope:Global                       
+  --                                                                            
+  ccmni3    Link encap:Ethernet  HWaddr 66:E8:D0:EE:B7:87                       
+            inet addr:10.131.0.2  Bcast:10.131.0.7  Mask:255.255.255.248        
+            inet6 addr: fe80::2/128 Scope:Link                                  
+            inet6 addr: 2001:db8:131:1::2/64 Scope:Global                       
+  --                                                                            
+  ccmni4    Link encap:Ethernet  HWaddr C6:8E:8C:EA:72:09                       
+            inet addr:10.141.0.2  Bcast:10.141.0.7  Mask:255.255.255.248        
+            inet6 addr: fe80::2/128 Scope:Link                                  
+            inet6 addr: 2001:db8:141:1::2/64 Scope:Global                       
+  Here is the gtp5g log:                                                        
+  [root@75N0-01N0SA-sled2-CN free5gc]#   dmesg | grep -E "Injecting RA|RA       
+  packet injected|RA injection"                                                 
+  [ 8745.390359] upfgtp:[gtp5g] gtp5g_genl_inject_ra: WNC: Injecting RA packet  
+  (SEID=1, PDR_ID=2, UE=2001:db8:121:1::2, len=88)                              
+  [ 8745.390412] upfgtp:[gtp5g] gtp5g_genl_inject_ra: WNC: RA packet injected   
+  successfully                                                                  
+  [ 8746.807216] upfgtp:[gtp5g] gtp5g_genl_inject_ra: WNC: Injecting RA packet  
+  (SEID=2, PDR_ID=5, UE=2001:db8:131:1::2, len=88)                              
+  [ 8746.807266] upfgtp:[gtp5g] gtp5g_genl_inject_ra: WNC: RA packet injected   
+  successfully                                                                  
+  [ 8747.954573] upfgtp:[gtp5g] gtp5g_genl_inject_ra: WNC: Injecting RA packet  
+  (SEID=3, PDR_ID=8, UE=2001:db8:141:1::2, len=88)                              
+  [ 8747.954622] upfgtp:[gtp5g] gtp5g_genl_inject_ra: WNC: RA packet injected   
+  successfully                                                                  
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+                                                                                
+  Here is tchsrk log:                                                           
+  [root@75N0-01N0SA-sled2-CN free5gc]#   tshark -i any -f "udp port 2152" -Y    
+  "icmpv6.type == 133 || icmpv6.type == 134" -V | grep -E "^Frame|Source        
+  Address|Destination Address|Tunnel Endpoint|Type: Router|Prefix:"             
+  Running as user "root" and group "root". This could be dangerous.             
+  Capturing on 'any'                                                            
+   ** (tshark:7386) 21:22:44.507840 [Main MESSAGE] -- Capture started.          
+   ** (tshark:7386) 21:22:44.507957 [Main MESSAGE] -- File:                     
+  "/tmp/wireshark_anyS2X0W3.pcapng"                                             
+  Frame 1: 116 bytes on wire (928 bits), 116 bytes captured (928 bits) on       
+  interface any, id 0                                                           
+      Source Address: 5.5.5.184                                                 
+  4     Destination Address: 5.5.5.2                                            
+      Source Address: fe80::2                                                   
+      Destination Address: ff02::2                                              
+      Type: Router Solicitation (133)                                           
+  Frame 2: 116 bytes on wire (928 bits), 116 bytes captured (928 bits) on       
+  interface any, id 0                                                           
+      Source Address: 5.5.5.184                                                 
+      Destination Address: 5.5.5.2                                              
+      Source Address: fe80::2                                                   
+      Destination Address: ff02::2                                              
+      Type: Router Solicitation (133)                                           
+  Frame 3: 148 bytes on wire (1184 bits), 148 bytes captured (1184 bits) on     
+  interface any, id 0                                                           
+      Source Address: 5.5.5.2                                                   
+      Destination Address: 5.5.5.184                                            
+      Source Address: fe80::1                                                   
+      Destination Address: fe80::2                                              
+      Type: Router Advertisement (134)                                          
+          Prefix: 2001:db8:121:1::                                              
+  Frame 4: 148 bytes on wire (1184 bits), 148 bytes captured (1184 bits) on     
+  interface any, id 0                                                           
+      Source Address: 5.5.5.2                                                   
+      Destination Address: 5.5.5.184                                            
+      Source Address: fe80::1                                                   
+      Destination Address: fe80::2                                              
+      Type: Router Advertisement (134)                                          
+          Prefix: 2001:db8:121:1::                                              
+  Frame 5: 116 bytes on wire (928 bits), 116 bytes captured (928 bits) on       
+  interface any, id 0                                                           
+      Source Address: 5.5.5.184                                                 
+      Destination Address: 5.5.5.2                                              
+      Source Address: fe80::2                                                   
+      Destination Address: ff02::2                                              
+      Type: Router Solicitation (133)                                           
+  Frame 6: 116 bytes on wire (928 bits), 116 bytes captured (928 bits) on       
+  interface any, id 0                                                           
+      Source Address: 5.5.5.184                                                 
+      Destination Address: 5.5.5.2                                              
+      Source Address: fe80::2                                                   
+      Destination Address: ff02::2                                              
+      Type: Router Solicitation (133)                                           
+  Frame 7: 148 bytes on wire (1184 bits), 148 bytes captured (1184 bits) on     
+  interface any, id 0                                                           
+      Source Address: 5.5.5.2                                                   
+      Destination Address: 5.5.5.184                                            
+      Source Address: fe80::1                                                   
+      Destination Address: fe80::2                                              
+      Type: Router Advertisement (134)                                          
+          Prefix: 2001:db8:131:1::                                              
+  Frame 8: 148 bytes on wire (1184 bits), 148 bytes captured (1184 bits) on     
+  interface any, id 0                                                           
+  8     Source Address: 5.5.5.2                                                 
+      Destination Address: 5.5.5.184                                            
+      Source Address: fe80::1                                                   
+      Destination Address: fe80::2                                              
+      Type: Router Advertisement (134)                                          
+          Prefix: 2001:db8:131:1::                                              
+  Frame 9: 116 bytes on wire (928 bits), 116 bytes captured (928 bits) on       
+  interface any, id 0                                                           
+      Source Address: 5.5.5.184                                                 
+      Destination Address: 5.5.5.2                                              
+      Source Address: fe80::2                                                   
+      Destination Address: ff02::2                                              
+      Type: Router Solicitation (133)                                           
+  Frame 10: 116 bytes on wire (928 bits), 116 bytes captured (928 bits) on      
+  interface any, id 0                                                           
+      Source Address: 5.5.5.184                                                 
+      Destination Address: 5.5.5.2                                              
+      Source Address: fe80::2                                                   
+      Destination Address: ff02::2                                              
+      Type: Router Solicitation (133)                                           
+  Frame 11: 148 bytes on wire (1184 bits), 148 bytes captured (1184 bits) on    
+  interface any, id 0                                                           
+      Source Address: 5.5.5.2                                                   
+      Destination Address: 5.5.5.184                                            
+      Source Address: fe80::1                                                   
+      Destination Address: fe80::2                                              
+      Type: Router Advertisement (134)                                          
+          Prefix: 2001:db8:141:1::                                              
+  Frame 12: 148 bytes on wire (1184 bits), 148 bytes captured (1184 bits) on    
+  interface any, id 0                                                           
+  12                                                                            
+                                                                                
+  ## The reason why I suspect RA is not sending correctly is because my UE      
+  never got route for "ip -6 route show default"                                
+
+● Reading the saved note about the earlier IPv6 multi-PDU routing problem,
+  because that problem was also on the UE side.
+
+  Recalled 1 memory (ctrl+o to expand)
+
+● The capture shows the RA leaving the CN correctly. Before I blame the UE, I'm
+  checking the RA's router lifetime field. The UE installs a default route only
+  if that field is nonzero.
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs
+      /smf; grep -niE "lifetime|autonom|0x40|0xc0|flags|M flag|O flag"
+      internal/context/route…)
+  ⎿  22:        // ICMPv6 Router Advertisement flags
+     24:        RAFlagOther     = 0x40 // Other configuration flag (O)
+     28:        DefaultRARouterLifetime   = 1800 // seconds (30 minutes)
+     … +5 lines (ctrl+o to expand)
+
+● The CN is sending a correct RA, and the RA is addressed to the right UE
+  address. The default route is missing because of something on the UE.
+
+  What the CN side shows, step by step:
+
+  Step: The UE sends an RS
+  Evidence: tshark frames 1, 5 and 9: fe80::2 → ff02::2, ICMPv6 type 133
+  Result: OK
+  ────────────────────────────────────────
+  Step: gtp5g sends one RA per PDU session
+  Evidence: dmesg: one Injecting RA line each for 2001:db8:121:1::2, 131:1::2
+  and
+  141:1::2
+  Result: OK
+  ────────────────────────────────────────
+  Step: The RA leaves the CN toward the gNB at 5.5.5.184
+  Evidence: tshark frames 3, 7 and 11: fe80::1 → fe80::2, type 134, with the
+  correct prefix for each slice
+  Result: OK
+  ────────────────────────────────────────
+  Step: The RA is sent to the UE's real link-local address
+  Evidence: The RA destination is fe80::2, and ifconfig on the UE shows fe80::2
+  on each ccmni interface
+  Result: OK, the addresses match
+  ────────────────────────────────────────
+  Step: The RA content allows a default route
+  Evidence: The SMF builds the RA with router lifetime 1800 seconds
+  (router_advertisement.go:28,79) and prefix flags L=1, A=1 (:87). A router
+  lifetime above 0 tells the UE to install a default route.
+  Result: OK
+
+  tshark shows every packet twice because -i any captures the same packet on two
+  CN interfaces. dmesg shows only one injection per session, so gtp5g sent each
+  RA once.
+
+  Why the UE probably has no default route. Your UE runs OpenWrt, and OpenWrt
+  usually sets net.ipv6.conf.all.forwarding=1 because it acts as a router. When
+  forwarding is on for an interface, the Linux kernel ignores every RA that
+  arrives on it, unless that interface's accept_ra setting is 2. (accept_ra
+  controls whether the kernel uses received RAs: 0 = never, 1 = only when
+  forwarding is off, 2 = always.) In that case the RA reaches ccmni1 and the
+  kernel silently drops it.
+
+  Your ifconfig output fits this:
+  - The global addresses are 2001:db8:121:1::2. That is the interface ID the SMF
+    assigned in NAS, which the MediaTek modem driver (the ccmni interfaces) or
+    OpenWrt's netifd set up directly. The RA did not create those addresses.
+  - If the kernel had processed the RA (A=1), it would normally add a second
+    address built from the interface's MAC address, such as
+    2001:db8:121:1:ac62:f8ff:fe12:725d on ccmni1. No such address is present.
+
+  Commands to confirm on the UE:
+
+  1. Read the three settings for ccmni1. If forwarding is 1 and accept_ra is 1
+     or 0, this is the cause.
+  for f in accept_ra accept_ra_defrtr forwarding; do echo "$f=$(cat 
+  /proc/sys/net/ipv6/conf/ccmni1/$f)"; done
+  cat /proc/sys/net/ipv6/conf/all/forwarding
+  2. Check whether the RA reaches the UE at all. Run this, then bring up a new
+     PDU session on slice 121:
+  tcpdump -ni ccmni1 icmp6
+  3. Check that a default route was not placed in a separate routing table. ip 
+     -6 route show default lists only the main table.
+  ip -6 route show table all | grep default
+
+  A temporary test, if step 1 shows forwarding=1: set accept_ra to 2 on ccmni1,
+  then bring up the PDU session again so that the UE sends a new RS. The CN
+  replies only to an RS and sends no periodic RAs.
+  echo 2 > /proc/sys/net/ipv6/conf/ccmni1/accept_ra
+  After that, ip -6 route show default should list default via fe80::1 dev 
+  ccmni1. This setting resets on reboot, so it is only a test. The permanent fix
+  is in the UE's OpenWrt configuration, not in free5gc.
+
+  ★ Insight ─────────────────────────────────────
+  - The RA's IPv6 source address is fe80::1, so the UE's default route will
+    point to fe80::1. In this design the UE's link has only two addresses,
+    fe80::1 for the network side and fe80::2 for the UE.
+  - When IPv6 setup fails on an OpenWrt UE, check the forwarding and accept_ra
+    settings early. A router is designed to ignore RAs, and the kernel drops
+    them without logging anything.
+    ─────────────────────────────────────────────────
+
+✻ Brewed for 50s · done 9:27 PM
+
+❯ ~ # for f in accept_ra accept_ra_defrtr forwarding; do echo "$f=$(cat         
+  /proc/sys/                                                                    
+  net/ipv6/conf/ccmni1/$f)"; done                                               
+  accept_ra=2                                                                   
+  accept_ra_defrtr=0                                                            
+  forwarding=1                                                                  
+  ~ #   cat /proc/sys/net/ipv6/conf/all/forwarding                              
+  1                                                                             
+  ~ #                                                                           
+  But I run below command before I turn on radio:                               
+                                                                                
+  ~ #   for d in $(ls /proc/sys/net/ipv6/conf | grep ccmni); do sysctl -w       
+  net.ipv6                                                                      
+  .conf.$d.accept_ra_defrtr=1; done                                             
+  net.ipv6.conf.ccmni0.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni1.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni10.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni11.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni12.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni13.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni14.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni15.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni16.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni17.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni18.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni19.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni2.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni20.accept_ra_defrtr = 1                                    
+  net.ipv6.conf.ccmni3.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni4.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni5.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni6.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni7.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni8.accept_ra_defrtr = 1                                     
+  net.ipv6.conf.ccmni9.accept_ra_defrtr = 1                                     
+  I will check why it change to 0 again.                                        
+
+● I was wrong about the cause. accept_ra is already 2 on ccmni1, so the kernel
+  does accept RAs even though forwarding is on. The real cause is
+  accept_ra_defrtr=0. accept_ra_defrtr decides whether the kernel installs the
+  router from an RA as a default route. With it at 0, the kernel uses the RA for
+  other things but never adds default via fe80::1. So the CN is fine, and the
+  remaining work is on the UE, as you planned.
+
+  Two likely ways your 1 got changed back to 0:
+
+  1. The ccmni interfaces are deleted and created again when the radio turns on.
+     A newly created interface takes its settings from net.ipv6.conf.default,
+     not from the old interface, so any per-interface value you set earlier is
+     lost. You can test this by comparing the interface index (ifindex, the
+     number the kernel gives each interface) before and after turning the radio
+     on. If the number changes, the interface was created again:
+  cat /sys/class/net/ccmni1/ifindex
+  cat /proc/sys/net/ipv6/conf/default/accept_ra_defrtr
+     If this is the cause, set the default value as well, before turning the
+  radio on:
+  sysctl -w net.ipv6.conf.default.accept_ra_defrtr=1
+     This does not explain why accept_ra is 2, because that is not the kernel's
+  default value. Some program on the UE writes accept_ra, and that program may
+  also write accept_ra_defrtr. That leads to the second possibility.
+
+  2. A program on the UE writes 0 when the PDU session comes up. Possible
+     writers are the MediaTek data-call scripts, OpenWrt's netifd, or odhcp6c.
+     (netifd is OpenWrt's network configuration daemon. odhcp6c is OpenWrt's
+     DHCPv6 and RA client.) To find the writer, search the UE's files for the
+     setting name. This also finds compiled programs that contain the name:
+  grep -rl accept_ra_defrtr /etc /lib /sbin /usr /system /vendor 2>/dev/null
+
+  One timing point for your test. The CN sends one RA only after it receives an
+  RS. It never sends RAs on a timer. The kernel decides whether to install the
+  route at the moment the RA arrives. So accept_ra_defrtr must already be 1 when
+  the RS is sent. If you fix the value after the PDU session is up, bring the
+  session up again so that the UE sends a new RS and gets a new RA.
+
+  ★ Insight ─────────────────────────────────────
+  - In this case the kernel received and processed the RA, but
+    accept_ra_defrtr=0 stopped it from creating a default route. Without a
+    capture on the UE, this looks the same as an RA that never arrived.
+  - The CN sends RAs only in reply to an RS. As a result, a UE setting that is
+    fixed after the session comes up has no effect until the next RS.
+    ─────────────────────────────────────────────────
+
+✻ Cooked for 21s · done 9:34 PM
+
+※ recap: The goal is to get an IPv6 default route on the UE; the CN sends correct Router Advertisements, but `accept_ra_defrtr` on the UE's `ccmni` interfaces keeps going back to 0. Next, compare `ccmni1`'s `ifindex` before and after turning the radio on to see whether the interface is being recreated. (disable recaps in /config)
+
+❯ OK, after UE set accept_ra_defrtr = 1, the ipv6 ping pass.                    
+
+● Good. The IPv6 data path works from end to end on the CN, and the missing
+  default route came from the UE setting accept_ra_defrtr.
+
+  I'm saving this result to memory, so that a later session starts with the UE
+  settings instead of debugging the CN RA path again. This first edit creates a
+  new memory file that records the cause, the evidence and the UE commands.
+
+  Wrote 1 memory (ctrl+o to expand)
+
+● This second edit adds a one-line pointer to the new file in MEMORY.md, the
+  index that is loaded at the start of each session.
+
+  Wrote 1 memory (ctrl+o to expand)
+
+● IPv6 ping now works, and free5gc needed no changes.
+
+  What happened:
+  - The CN was sending RAs correctly. The UE sent a Router Solicitation (RS),
+    and the SMF built one RA in reply for each PDU session. gtp5g sent each RA
+    to the gNB at 5.5.5.184, addressed to the UE's link-local address fe80::2.
+    Each RA had router lifetime 1800, which tells the UE to install a default
+    route.
+  - The UE kernel was receiving the RAs. Because accept_ra_defrtr was 0, the
+    kernel did not turn the RA's router into a default route.
+  - Setting accept_ra_defrtr=1 on the UE fixed the problem.
+
+  Still open on the UE: finding out what resets accept_ra_defrtr to 0 after you
+  set it before turning on the radio. Once you know the cause, put the setting
+  in the UE's startup configuration so that it survives a reboot.
+
+  Cleanup on the CN: gtp5g's debug level is still 3, which writes extra lines to
+  the kernel log. Set it back to the value it had before. If you didn't note
+  that value, the gtp5g default is usually 1:
+  echo 1 > /proc/gtp5g/dbg
+
+  I saved this result to memory, so a later session will check the UE settings
+  before the CN's RA path.
+
+  ★ Insight ─────────────────────────────────────
+  - On Linux, three settings must all allow it before an RA becomes a default
+    route: accept_ra (whether RAs are used), forwarding (with accept_ra=1,
+    forwarding blocks RAs), and accept_ra_defrtr (whether the RA's router
+    becomes a default route). Your UE had the first two set correctly. Only the
+    third was blocking the route.
+  - The UE address 2001:db8:121:1::2 was present the whole time, even with no
+    default route. That address came from the NAS PDU address that the modem
+    driver set up, not from the RA. So an IPv6 address on the UE does not prove
+    that the UE used the RA.
+    ─────────────────────────────────────────────────
+
+✻ Brewed for 29s · done 11:38 PM

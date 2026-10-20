@@ -1,0 +1,969 @@
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/Downloads/source_code/free5gc_use_open5gs_ipv6
+
+
+❯ I have reboot my remote CN and run free5gc, here is the error I got:          
+  2026-10-12T19:07:13.458302220+08:00 [ERRO][UPF][Main] UPF Cli Run Error: open 
+  Gtp5g: open link: create: operation not supported                             
+  /home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/run.sh: line 135: mongo: 
+  command not found                                                             
+  true                                                                          
+
+● I'll read the saved note about the gtp5g module parameter and the part of
+  run.sh that calls mongo, so I can explain both errors.
+
+  Recalled 1 memory (ctrl+o to expand)
+
+● Bash(sed -n 120,145p
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/run.sh)
+  ⎿  DB_NAME="free5gc"
+     DB_DROP_COLLECTION=(
+     "NfProfile"
+     … +22 lines (ctrl+o to expand)
+
+● Bash(tmux has-session -t cn 2>/dev/null || tmux new-session -d -s cn 'my-ssh
+      --target cn'; sleep 3; tmux send-keys -t cn "clear; uname -r; lsmod | grep
+      gtp; modinfo…)
+  ⎿  Interrupted · What should Claude do instead?
+
+✻ Worked for 15s · done 7:08 PM
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]# run_free5gc                              
+  insmod: ERROR: could not insert module                                        
+  /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g/gtp5g.ko: Invalid module   
+  format                                                                        
+  log path: ./log/20261012_190713/                                              
+  tcpdump: data link type LINUX_SLL2                                            
+  tcpdump: listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot   
+  length 262144 bytes                                                           
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl] WARNING: config file not found in any   
+  of: [/home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/go-gtp5gnl.yaml     
+  /home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/bin/go-gtp5gnl.yaml      
+  /etc/go-gtp5gnl/go-gtp5gnl.yaml]                                              
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl] Using default configuration (may not be 
+  optimal for this system)                                                      
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl] Please run:                             
+  ./scripts/detect_kernel_params.sh > go-gtp5gnl.yaml                           
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl] Configuration:                          
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl]   PAGE_SIZE = 4096                      
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl]   MAX_SKB_FRAGS = 17                    
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl]   SKB_OVERHEAD = 320                    
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl]   NLMSG_HDRLEN = 16                     
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl] Calculated values:                      
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl]   nlmsgGoodSize = 3776                  
+  2026/10/12 19:07:13 WNC: [go-gtp5gnl]   nlmsgDefaultSize = 3760               
+  2026/10/12 19:07:13 [go-gtp5gnl] WNC: 25-12-12-15 go-gtp5gnl report.go loaded 
+  (DebugLogging=true)                                                           
+  2026-10-12T19:07:13.446080265+08:00 [INFO][UPF][Main] UPF version:            
+      free5GC version: v4.0.1-kk-snap-003-9-g98540a9                            
+      build time:      2026-07-28T07:36:40Z                                     
+      commit hash:     -6b438f3                                                 
+      commit time:     2026-07-08T08:48:41Z                                     
+      go version:      go1.21.8 linux/amd64                                     
+  2026-10-12T19:07:13.446330115+08:00 [INFO][UPF][CFG] Read config from         
+  [./config/upfcfg.yaml]                                                        
+  2026-10-12T19:07:13.451889573+08:00 [INFO][UPF][CFG] WNC: Validated 56 DNN    
+  configurations (IPv4-only: 45, IPv6-only: 0, dual-stack: 11)                  
+  2026-10-12T19:07:13.451980040+08:00 [INFO][UPF][CFG] WNC: Loaded 1 Router     
+  Advertisement profiles                                                        
+  2026-10-12T19:07:13.452987296+08:00 [INFO][UPF][CFG]                          
+  ==================================================                            
+  2026-10-12T19:07:13.453066416+08:00 [INFO][UPF][CFG]                          
+  (*factory.Config)(0xc0001b0f00)({                                             
+      Version: (string) (len=5) "1.0.3",                                        
+      Description: (string) (len=31) "UPF initial local configuration",         
+      Pfcp: (*factory.Pfcp)(0xc000624240)({                                     
+          Addr: (string) (len=7) "5.5.5.2",                                     
+          NodeID: (string) (len=7) "5.5.5.2",                                   
+          RetransTimeout: (time.Duration) 1s,                                   
+          MaxRetrans: (uint8) 3                                                 
+      }),                                                                       
+      Gtpu: (*factory.Gtpu)                                                     
+  ──── (639 lines hidden) ───────────────────────────────────────────────────── 
+           Sst: (int32) 1,                                                      
+                  Sd: (string) (len=6) "050601"                                 
+              })                                                                
+          },                                                                    
+          (factory.DnnList) {                                                   
+              Dnn: (string) (len=7) "wnctest",                                  
+              Cidr: (string) (len=13) "10.177.0.0/16",                          
+              NatIfName: (string) "",                                           
+              IPv6: (*factory.IPv6Pool)(<nil>),                                 
+              Snssai: (*factory.Snssai)(0xc000122e88)({                         
+                  Sst: (int32) 2,                                               
+                  Sd: (string) (len=6) "050602"                                 
+              })                                                                
+          },                                                                    
+          (factory.DnnList) {                                                   
+              Dnn: (string) (len=7) "wnctest",                                  
+              Cidr: (string) (len=13) "10.187.0.0/16",                          
+              NatIfName: (string) "",                                           
+              IPv6: (*factory.IPv6Pool)(<nil>),                                 
+              Snssai: (*factory.Snssai)(0xc000122ea0)({                         
+                  Sst: (int32) 3,                                               
+                  Sd: (string) (len=6) "050603"                                 
+              })                                                                
+          }                                                                     
+      },                                                                        
+      Logger: (*factory.Logger)(0xc00016d200)({                                 
+          Enable: (bool) true,                                                  
+          Level: (string) (len=5) "trace",                                      
+          ReportCaller: (bool) false                                            
+      }),                                                                       
+      RouterAdvertisements: (map[string]*factory.RouterAdvertisementProfile)    
+  (len=1) {                                                                     
+          (string) (len=7) "default":                                           
+  (*factory.RouterAdvertisementProfile)(0xc0004b0000)({                         
+              Enable: (bool) true,                                              
+              RouterAddress: (string) (len=7) "fe80::1",                        
+              PrefixLength: (int) 64,                                           
+              LinkMtu: (uint32) 1500,                                           
+              Flags: (uint8) 192,                                               
+              Lifetime: (uint32) 1800,                                          
+              ReachableTimer: (uint32) 0,                                       
+              RetransTimer: (uint32) 0,                                         
+              DNS: ([]string) (len=2 cap=2) {                                   
+                  (string) (len=20) "2001:4860:4860::8888",                     
+                  (string) (len=20) "2001:4860:4860::8844"                      
+              }                                                                 
+          })                                                                    
+      },                                                                        
+      HttpService: (*factory.HttpService)(0xc00016d1e0)({                       
+          Enable: (bool) true,                                                  
+          Addr: (string) (len=7) "5.5.5.2",                                     
+          Port: (uint16) 8080                                                   
+      })                                                                        
+  })                                                                            
+  2026-10-12T19:07:13.453876838+08:00 [INFO][UPF][CFG]                          
+  ==================================================                            
+  2026-10-12T19:07:13.453906605+08:00 [INFO][UPF][Main] Log level is set to     
+  [trace]                                                                       
+  2026-10-12T19:07:13.453940257+08:00 [INFO][UPF][Main] Report Caller is set to 
+  [false]                                                                       
+  2026-10-12T19:07:13.454330638+08:00 [INFO][UPF][Main] starting Gtpu Forwarder 
+  [gtp5g]                                                                       
+  2026-10-12T19:07:13.454410095+08:00 [INFO][UPF][Main] GTP Address:            
+  "5.5.5.2:2152"                                                                
+  2026-10-12T19:07:13.458302220+08:00 [ERRO][UPF][Main] UPF Cli Run Error: open 
+  Gtp5g: open link: create: operation not supported                             
+  /home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/run.sh: line 135: mongo: 
+  command not found                                                             
+  true                                                                          
+
+● The first line of the full log shows the cause:
+
+  insmod: ERROR: could not insert module .../gtp5g/gtp5g.ko: Invalid module 
+  format
+
+  What happened. run_free5gc tries to load the gtp5g kernel module from
+  gtp5g/gtp5g.ko, and the kernel refused it with "Invalid module format". The
+  kernel gives this error when a .ko file was built for a different kernel
+  version than the one running. The most likely cause is that the reboot started
+  a newer kernel, for example after a package update installed one. The old
+  gtp5g.ko is still built for the previous kernel.
+
+  The UPF error follows from that. The module did not load, so no kernel module
+  registered the gtp5g link type. When the UPF asked the kernel to create the
+  gtp5g network interface, the kernel answered "operation not supported".
+
+  mongo: command not found can be ignored. run.sh:135 calls the old mongo shell
+  first and then calls mongosh. The true printed after it is the output of
+  mongosh, so the database cleanup did run.
+
+  How to fix it. Run these on the CN machine:
+
+  # 1. Compare the running kernel with the kernel the .ko was built for
+  uname -r
+  modinfo /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g/gtp5g.ko | grep
+  vermagic
+
+  # 2. If the two versions differ, make sure headers for the running kernel 
+  exist
+  ls /lib/modules/$(uname -r)/build
+
+  # 3. Rebuild gtp5g against the running kernel
+  cd /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g
+  make clean && make
+
+  # 4. Load it with the IPv6 data path turned on, then check that it loaded
+  insmod gtp5g.ko ipv6_data_path=1
+  cat /sys/module/gtp5g/parameters/ipv6_data_path    # should print Y
+  dmesg | grep -i gtp5g | tail -5
+
+  If step 2 shows that the build directory is missing, install the kernel
+  headers before step 3. On a RHEL-family system, which the [root@...] prompt
+  suggests, the command is dnf install kernel-devel-$(uname -r). On Ubuntu it is
+  apt install linux-headers-$(uname -r).
+
+  ipv6_data_path=1 matters for your IPv6 work. The gtp5g module turns the IPv6
+  data path off by default. If run_free5gc runs insmod without this parameter,
+  the UPF will report no IPv6 support even after the rebuild. Check how the
+  run_free5gc alias calls insmod with type run_free5gc on CN.
+
+  After the module loads, run run_free5gc again. If the module is already
+  loaded, its insmod will fail with "File exists", and that error is harmless.
+
+  ★ Insight ─────────────────────────────────────
+  - A kernel module stores the kernel version it was built for in a "vermagic"
+    string. The kernel refuses to load a module whose vermagic does not match
+    the running kernel, which is the "Invalid module format" error above. That
+    is why every kernel upgrade breaks a module built by hand with make.
+  - The gtp5g README describes DKMS support, a system that rebuilds out-of-tree
+    modules automatically when a new kernel is installed. Setting it up would
+    stop this failure from coming back after the next kernel update.
+    ─────────────────────────────────────────────────
+
+  Paste the output of steps 1 and 2 if the rebuild fails or the versions turn
+  out to match.
+
+✻ Churned for 14s · done 7:09 PM
+
+❯ I think it is running right?                                                  
+  [root@75N0-01N0SA-sled2-CN free5gc]# run_free5gc                              
+  insmod: ERROR: could not insert module                                        
+  /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g/gtp5g.ko: File exists      
+  log path: ./log/20261012_191230/                                              
+  tcpdump: data link type LINUX_SLL2                                            
+  tcpdump: listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot   
+  length 262144 bytes                                                           
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl] WARNING: config file not found in any   
+  of: [/home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/go-gtp5gnl.yaml     
+  /home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/bin/go-gtp5gnl.yaml      
+  /etc/go-gtp5gnl/go-gtp5gnl.yaml]                                              
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl] Using default configuration (may not be 
+  optimal for this system)                                                      
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl] Please run:                             
+  ./scripts/detect_kernel_params.sh > go-gtp5gnl.yaml                           
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl] Configuration:                          
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl]   PAGE_SIZE = 4096                      
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl]   MAX_SKB_FRAGS = 17                    
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl]   SKB_OVERHEAD = 320                    
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl]   NLMSG_HDRLEN = 16                     
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl] Calculated values:                      
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl]   nlmsgGoodSize = 3776                  
+  2026/10/12 19:12:30 WNC: [go-gtp5gnl]   nlmsgDefaultSize = 3760               
+  2026/10/12 19:12:30 [go-gtp5gnl] WNC: 25-12-12-15 go-gtp5gnl report.go loaded 
+  (DebugLogging=true)                                                           
+  2026-10-12T19:12:30.322995723+08:00 [INFO][UPF][Main] UPF version:            
+      free5GC version: v4.0.1-kk-snap-003-9-g98540a9                            
+      build time:      2026-07-28T07:36:40Z                                     
+      commit hash:     -6b438f3                                                 
+      commit time:     2026-07-08T08:48:41Z                                     
+      go version:      go1.21.8 linux/amd64                                     
+  2026-10-12T19:12:30.323263018+08:00 [INFO][UPF][CFG] Read config from         
+  [./config/upfcfg.yaml]                                                        
+  2026-10-12T19:12:30.329543222+08:00 [INFO][UPF][CFG] WNC: Validated 56 DNN    
+  configurations (IPv4-only: 45, IPv6-only: 0, dual-stack: 11)                  
+  2026-10-12T19:12:30.329612217+08:00 [INFO][UPF][CFG] WNC: Loaded 1 Router     
+  Advertisement profiles                                                        
+  2026-10-12T19:12:30.330597726+08:00 [INFO][UPF][CFG]                          
+  ==================================================                            
+  2026-10-12T19:12:30.330654823+08:00 [INFO][UPF][CFG]                          
+  (*factory.Config)(0xc000220de0)({                                             
+      Version: (string) (len=5) "1.0.3",                                        
+      Description: (string) (len=31) "UPF initial local configuration",         
+      Pfcp: (*factory.Pfcp)(0xc00025a7b0)({                                     
+          Addr: (string) (len=7) "5.5.5.2",                                     
+          NodeID: (string) (len=7) "5.5.5.2",                                   
+          RetransTimeout: (time.Duration) 1s,                                   
+          MaxRetrans: (uint8) 3                                                 
+      }),                                                                       
+      Gt                                                                        
+  ──── (801 lines hidden) ───────────────────────────────────────────────────── 
+  AI: SST:3 SD:050603): 10.187.0.0/16                                           
+  2026-10-12T19:12:30.393828116+08:00 [INFO][UPF][PFCP][LAddr:5.5.5.2:8805]     
+  starting pfcp server                                                          
+  2026-10-12T19:12:30.393868726+08:00 [INFO][UPF][PFCP][LAddr:5.5.5.2:8805]     
+  pfcp server started                                                           
+  2026-10-12T19:12:30.393927921+08:00 [INFO][UPF][Main][component:HttpServer]   
+  WNC: Starting HTTP server on 5.5.5.2:8080                                     
+  2026-10-12T19:12:30.393969822+08:00 [INFO][UPF][Main][component:HttpServer]   
+  WNC: HTTP RA injection endpoint started on 5.5.5.2:8080                       
+  2026-10-12T19:12:30.394001712+08:00 [INFO][UPF][Main] UPF started             
+  2026-10-12T19:12:30.394336601+08:00 [TRAC][UPF][PFCP][LAddr:5.5.5.2:8805]     
+  receiver starts to read...                                                    
+  /home/wnc/Downloads/free5gc_use_open5gs_ipv6/free5gc/run.sh: line 135: mongo: 
+  command not found                                                             
+  true                                                                          
+  Started nrf with PID 3813                                                     
+  2026-10-12T19:12:30.890318005+08:00 [INFO][NRF][Main] NRF version:            
+      free5GC version: v4.0.1-kk-snap-003-9-g98540a9                            
+      build time:      2026-07-09T02:13:55Z                                     
+      commit hash:     ede22ec3                                                 
+      commit time:     2025-04-17T10:41:06Z                                     
+      go version:      go1.21.8 linux/amd64                                     
+  2026-10-12T19:12:30.890656132+08:00 [INFO][NRF][CFG] Read config from         
+  [./config/nrfcfg.yaml]                                                        
+  2026-10-12T19:12:30.891776501+08:00 [INFO][NRF][Main] Log enable is set to    
+  [true]                                                                        
+  2026-10-12T19:12:30.891829395+08:00 [INFO][NRF][Main] Log level is set to     
+  [trace]                                                                       
+  2026-10-12T19:12:30.891857522+08:00 [INFO][NRF][Main] Report Caller is set to 
+  [false]                                                                       
+  2026-10-12T19:12:30.891893487+08:00 [INFO][NRF][Init] nrfconfig Info:         
+  Version[1.0.2] Description[NRF initial local configuration]                   
+  2026-10-12T19:12:30.893532260+08:00 [INFO][NRF][Init] generate new NRF cert   
+  2026-10-12T19:12:30.899698125+08:00 [INFO][NRF][SBI] Binding addr:            
+  [127.0.0.10:8000]                                                             
+  2026-10-12T19:12:30.899994584+08:00 [INFO][NRF][Init] Server starting         
+  2026-10-12T19:12:30.900052359+08:00 [INFO][NRF][SBI] SBI server started       
+  Started amf with PID 3831                                                     
+  2026-10-12T19:12:30.990855739+08:00 [INFO][AMF][Main] AMF version:            
+      free5GC version: v4.0.1-kk-snap-003-9-g98540a9                            
+      build time:      2026-10-08T10:47:21Z                                     
+      commit hash:     335918b1                                                 
+      commit time:     2025-08-28T06:43:54Z                                     
+      go version:      go1.21.8 linux/amd64                                     
+  ## But my run_free5gc command is saved in ~/.bashrc, it is doing the same     
+  thing as you suggest, why it was not working?                                 
+  run_free5gc(){                                                                
+      insmod /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g/gtp5g.ko        
+  ipv6_data_path=1                                                              
+      /home/wnc/Downloads/free5gc_$free5gc_ver/free5gc/run.sh -cp -dp 2>&1 |    
+  tee /home/wnc/Downloads/free5gc_$free5gc_ver/free5gc/log/console_free5gc.log  
+  }                                                                             
+                                                                                
+
+● Yes, it is running. These lines from the log show it:
+
+  - Kernel reports IPv6 data path support: true. The gtp5g module is loaded, and
+    its ipv6_data_path parameter is on.
+  - Forwarder started followed by UPF started. The UPF created the upfgtp
+    network interface this time, and it added the IPv4 and IPv6 routes for every
+    DNN.
+  - Started nrf with PID 3813 and Started amf with PID 3831. run.sh has moved on
+    and is starting the other network functions.
+
+  The insmod: ... File exists error on the first line is harmless. It means a
+  gtp5g module was already loaded, because you loaded it yourself after the
+  rebuild. The kernel refuses to load the same module twice.
+
+  Why run_free5gc failed the first time. The insmod line in run_free5gc was
+  correct. The problem was the file it loaded. run_free5gc loads gtp5g/gtp5g.ko
+  as it is on disk, and it never rebuilds that file. Before the reboot, gtp5g.ko
+  had been built for the old kernel. After the reboot, the new kernel refused
+  it with Invalid module format. Your make step created a new gtp5g.ko for the
+  running kernel, so the same insmod line now works.
+
+  run_free5gc also does not stop when insmod fails. It went on to run run.sh, so
+  the real cause (Invalid module format) appeared only on the first line. The
+  visible error came later, from the UPF (operation not supported).
+
+  What to expect next time. The next time this machine boots into a different
+  kernel version, run_free5gc will fail in the same way until you run make in
+  gtp5g/ again. Rebooting into the same kernel is fine, because the rebuilt
+  gtp5g.ko matches it.
+
+  I can suggest a version of run_free5gc that checks this before it starts. It
+  would compare the vermagic of gtp5g.ko with uname -r and stop with a clear
+  message if they differ. Tell me if you want it.
+
+✻ Crunched for 13s · done 7:14 PM
+
+❯ But it should be the same kernel, I run by the same command before reboot, or 
+  are you saying after reboot, I use the different kernel?                      
+
+● No, I did not check that. I assumed a kernel change, and I have no evidence
+  that the kernel changed. I am sorry for stating it as the cause.
+
+  Your old gtp5g.ko did not match the running kernel. The Invalid module format
+  error proves that much. There are two ways this could happen.
+
+  1. The kernel changed at the reboot. A package update may have installed a
+     newer kernel earlier, and the machine only started using it at this reboot.
+     Before the reboot, the old kernel was still running and matched the old
+     .ko.
+  2. The kernel did not change, and the old .ko never matched it. Before the
+     reboot, the gtp5g module stayed loaded in memory from an earlier session.
+     Each run_free5gc then failed at insmod with File exists, and you probably
+     did not notice because it is harmless. The UPF used the module that was
+     already in memory. Meanwhile, the gtp5g.ko file on disk had been replaced
+     by a build for a different kernel. For example, it may have been built
+     against kernel headers of a different version, or copied over from another
+     machine together with the source. A reboot clears the module from memory.
+     That reboot was the first time the file on disk was actually loaded.
+
+  You can tell which one happened by running these on CN. Each command is
+  read-only.
+
+  # Kernel version of the current boot and of the boot before it
+  uname -r
+  journalctl -k -b -1 | grep -m1 "Linux version"
+
+  # Installed kernels and their install dates (RHEL-family)
+  rpm -q kernel --last
+
+  If the Linux version from the previous boot is the same as uname -r, the
+  kernel did not change and case 2 is the explanation. If journalctl -b -1
+  reports that no previous boot is stored, the system journal is not saved
+  across reboots. In that case, use the install dates from rpm -q kernel --last.
+  A kernel installed after your last successful start before the reboot points
+  to case 1.
+
+  You already rebuilt gtp5g.ko, so its old vermagic can no longer be checked.
+
+✻ Churned for 15s · done 7:16 PM
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]# uname -r                                 
+  5.15.0-198-generic                                                            
+  [root@75N0-01N0SA-sled2-CN free5gc]#   uname -r                               
+    journalctl -k -b -1 | grep -m1 "Linux version"                              
+  5.15.0-198-generic                                                            
+  [root@75N0-01N0SA-sled2-CN free5gc]#   rpm -q kernel --last                   
+  Command 'rpm' not found, but can be installed with:                           
+  apt install rpm                                                               
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+
+● The CN machine runs Ubuntu, not a RHEL-family system. 5.15.0-198-generic is an
+  Ubuntu kernel name. I guessed RHEL from the [root@...] prompt, and that guess
+  was wrong, so rpm was the wrong tool.
+
+  journalctl -k -b -1 printed nothing. That usually means the system journal
+  does not keep logs from earlier boots on this machine. On Ubuntu, rsyslog also
+  writes kernel messages to /var/log/kern.log, and that file is kept across
+  reboots. These read-only commands should answer the question:
+
+  # Kernel version recorded at each boot, from rsyslog's kernel log (current and
+  rotated files)
+  zgrep -h "Linux version" /var/log/kern.log* | awk '{print $1, $2, $3, $8}'
+
+  # When each installed kernel was installed (newest first)
+  ls -lt --time-style=long-iso /boot/vmlinuz-*
+
+  # Kernel packages installed or upgraded by apt, with dates
+  zgrep -h -B3 "linux-image" /var/log/apt/history.log* | grep -E
+  "Start-Date|linux-image"
+
+  # Reboot history
+  last -x reboot | head
+
+  Here is how to read the output:
+
+  - Case 1, the kernel changed. The first command shows a different kernel
+    version (field 8) on the boot before today's. Or /boot and the apt history
+    show 5.15.0-198 installed after the last time run_free5gc worked.
+  - Case 2, the kernel did not change. Every boot in kern.log shows
+    5.15.0-198-generic, and 5.15.0-198 was installed well before that. Then the
+    old gtp5g.ko on disk was built for some other kernel, and before the reboot
+    the UPF was using a module that was already loaded in memory.
+
+  Paste the output, and I will say which case it shows.
+
+✻ Crunched for 10s · done 7:16 PM
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]#   zgrep -h "Linux version"               
+  /var/log/kern.log* | awk '{print $1, $2, $3, $8}'                             
+  Oct 12 18:58:17 Linux                                                         
+  [root@75N0-01N0SA-sled2-CN free5gc]#   ls -lt --time-style=long-iso           
+  /boot/vmlinuz-*                                                               
+  -rw------- 1 root root 11741416 2026-09-04 17:55                              
+  /boot/vmlinuz-5.15.0-198-generic                                              
+  -rw------- 1 root root 11725608 2026-06-20 00:28                              
+  /boot/vmlinuz-5.15.0-185-generic                                              
+  [root@75N0-01N0SA-sled2-CN free5gc]#   zgrep -h -B3 "linux-image"             
+  /var/log/apt/history.log* | grep -E "Start-Date|linux-image"                  
+  Start-Date: 2026-10-07  06:19:28                                              
+  Install: linux-headers-5.15.0-198:amd64 (5.15.0-198.208, automatic),          
+  linux-modules-extra-5.15.0-198-generic:amd64 (5.15.0-198.208, automatic),     
+  linux-headers-5.15.0-198-generic:amd64 (5.15.0-198.208, automatic),           
+  linux-image-5.15.0-198-generic:amd64 (5.15.0-198.208, automatic),             
+  linux-modules-5.15.0-198-generic:amd64 (5.15.0-198.208, automatic)            
+  Upgrade: linux-headers-generic:amd64 (5.15.0.194.171, 5.15.0.198.171),        
+  linux-generic:amd64 (5.15.0.194.171, 5.15.0.198.171),                         
+  linux-image-generic:amd64 (5.15.0.194.171, 5.15.0.198.171)                    
+  Start-Date: 2026-10-07  06:22:05                                              
+  Remove: linux-image-5.15.0-194-generic:amd64 (5.15.0-194.204),                
+  linux-modules-5.15.0-194-generic:amd64 (5.15.0-194.204)                       
+  Start-Date: 2025-12-04  06:04:36                                              
+  Install: linux-headers-5.15.0-163:amd64 (5.15.0-163.173, automatic),          
+  linux-modules-5.15.0-163-generic:amd64 (5.15.0-163.173, automatic),           
+  linux-modules-extra-5.15.0-163-generic:amd64 (5.15.0-163.173, automatic),     
+  linux-headers-5.15.0-163-generic:amd64 (5.15.0-163.173, automatic),           
+  linux-image-5.15.0-163-generic:amd64 (5.15.0-163.173, automatic)              
+  Upgrade: linux-headers-generic:amd64 (5.15.0.161.157, 5.15.0.163.158),        
+  linux-generic:amd64 (5.15.0.161.157, 5.15.0.163.158),                         
+  linux-image-generic:amd64 (5.15.0.161.157, 5.15.0.163.158)                    
+  Start-Date: 2025-12-04  06:05:47                                              
+  Remove: linux-image-5.15.0-153-generic:amd64 (5.15.0-153.163),                
+  linux-modules-5.15.0-153-generic:amd64 (5.15.0-153.163)                       
+  Start-Date: 2025-12-12  06:18:13                                              
+  Install: linux-image-5.15.0-164-generic:amd64 (5.15.0-164.174, automatic),    
+  linux-modules-5.15.0-164-generic:amd64 (5.15.0-164.174, automatic),           
+  linux-headers-5.15.0-164:amd64 (5.15.0-164.174, automatic),                   
+  linux-modules-extra-5.15.0-164-generic:amd64 (5.15.0-164.174, automatic),     
+  linux-headers-5.15.0-164-generic:amd64 (5.15.0-164.174, automatic)            
+  Upgrade: linux-headers-generic:amd64 (5.15.0.163.158, 5.15.0.164.159),        
+  linux-generic:amd64 (5.15.0.163.158, 5.15.0.164.159),                         
+  linux-image-generic:amd64 (5.15.0.163.158, 5.15.0.164.159)                    
+  St                                                                            
+  ──── (81 lines hidden) ────────────────────────────────────────────────────── 
+  age-5.15.0-161-generic:amd64 (5.15.0-161.171),                                
+  linux-modules-5.15.0-161-generic:amd64 (5.15.0-161.171),                      
+  linux-modules-extra-5.15.0-161-generic:amd64 (5.15.0-161.171)                 
+  Start-Date: 2026-02-12  06:37:23                                              
+  Install: linux-modules-5.15.0-170-generic:amd64 (5.15.0-170.180, automatic),  
+  linux-headers-5.15.0-170:amd64 (5.15.0-170.180, automatic),                   
+  linux-modules-extra-5.15.0-170-generic:amd64 (5.15.0-170.180, automatic),     
+  linux-headers-5.15.0-170-generic:amd64 (5.15.0-170.180, automatic),           
+  linux-image-5.15.0-170-generic:amd64 (5.15.0-170.180, automatic)              
+  Upgrade: linux-headers-generic:amd64 (5.15.0.168.159, 5.15.0.170.159),        
+  linux-generic:amd64 (5.15.0.168.159, 5.15.0.170.159),                         
+  linux-image-generic:amd64 (5.15.0.168.159, 5.15.0.170.159)                    
+  Start-Date: 2026-02-12  06:38:25                                              
+  Remove: linux-image-5.15.0-168-generic:amd64 (5.15.0-168.178),                
+  linux-modules-5.15.0-168-generic:amd64 (5.15.0-168.178),                      
+  linux-modules-extra-5.15.0-168-generic:amd64 (5.15.0-168.178)                 
+  Start-Date: 2026-02-26  06:26:07                                              
+  Install: linux-image-5.15.0-171-generic:amd64 (5.15.0-171.181, automatic),    
+  linux-modules-5.15.0-171-generic:amd64 (5.15.0-171.181, automatic),           
+  linux-headers-5.15.0-171:amd64 (5.15.0-171.181, automatic),                   
+  linux-modules-extra-5.15.0-171-generic:amd64 (5.15.0-171.181, automatic),     
+  linux-headers-5.15.0-171-generic:amd64 (5.15.0-171.181, automatic)            
+  Upgrade: linux-headers-generic:amd64 (5.15.0.170.159, 5.15.0.171.160),        
+  linux-generic:amd64 (5.15.0.170.159, 5.15.0.171.160),                         
+  linux-image-generic:amd64 (5.15.0.170.159, 5.15.0.171.160)                    
+  Start-Date: 2026-02-26  06:27:45                                              
+  Remove: linux-image-5.15.0-164-generic:amd64 (5.15.0-164.174),                
+  linux-modules-5.15.0-164-generic:amd64 (5.15.0-164.174)                       
+  [root@75N0-01N0SA-sled2-CN free5gc]#   last -x reboot | head                  
+  reboot   system boot  5.15.0-198-gener Mon Oct 12 18:58   still running       
+  reboot   system boot  5.15.0-185-gener Mon Jul  6 18:03 - 18:50 (98+00:47)    
+  reboot   system boot  5.15.0-171-gener Thu Feb 26 16:03 - 17:40 (130+01:37)   
+  reboot   system boot  5.15.0-170-gener Tue Feb 24 10:17 - 17:40 (132+07:23)   
+  reboot   system boot  5.15.0-164-gener Mon Dec 15 11:59 - 18:30 (60+06:30)    
+  reboot   system boot  5.15.0-161-gener Mon Nov 17 20:03 - 00:16 (25+04:12)    
+  reboot   system boot  5.15.0-161-gener Mon Nov 17 16:25 - 19:50  (03:24)      
+  reboot   system boot  5.15.0-153-gener Wed Sep  3 21:33 - 15:47 (74+18:13)    
+  reboot   system boot  5.15.0-153-gener Wed Sep  3 21:08 - 15:47 (74+18:39)    
+  reboot   system boot  5.15.0-153-gener Wed Sep  3 20:54 - 15:47 (74+18:53)    
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+
+● The kernel did change, so case 1 is what happened. You were right that you ran
+  the same command before, but it was running on a different kernel then.
+
+  The output shows these steps:
+
+  1. The previous boot ran kernel 5.15.0-185. last -x reboot shows that the
+     machine booted on Jul 6 with 5.15.0-185-generic and ran for 98 days without
+     a reboot. Your gtp5g.ko was built during that time, so it was built for
+     5.15.0-185. Every run_free5gc before today ran on that kernel, which is why
+     it worked.
+  2. apt installed newer kernels in the background during those 98 days. The apt
+     history shows kernel installs on 2026-07-21 (-186), 08-06 (-187), 08-21
+     (-190), 09-05 (-191), 09-24 (-194), and 10-07 (-198). All of them ran at
+     about 06:00 and were marked automatic. That pattern points to Ubuntu's
+     automatic updates (unattended-upgrades, which installs updates on a daily
+     timer). A newly installed kernel is used only after a reboot, so the
+     running kernel stayed 5.15.0-185 the whole time.
+  3. Today's reboot started 5.15.0-198. It is the newest installed kernel, so
+     the boot loader picked it by default. The gtp5g.ko built for -185 no longer
+     matched, so insmod failed with Invalid module format.
+
+  The kern.log check printed only one line because that log keeps only recent
+  weeks. The file now holds only today's boot.
+
+  This will happen again at the next reboot after apt installs another kernel.
+  On this machine, that has been about every two to three weeks. There are three
+  ways to prevent it:
+
+  - Rebuild before loading. Change run_free5gc to run make in gtp5g/ first when
+    the vermagic of gtp5g.ko does not match uname -r. This is the smallest
+    change, and it touches only your ~/.bashrc.
+  - Register gtp5g with DKMS (Dynamic Kernel Module Support, an Ubuntu tool that
+    rebuilds out-of-tree modules automatically each time apt installs a new
+    kernel). The gtp5g README describes DKMS support. With it, the module would
+    be ready before the next reboot.
+  - Stop apt from installing new kernels with apt-mark hold linux-generic 
+    linux-image-generic linux-headers-generic. This keeps the lab kernel fixed,
+    but the machine also stops getting kernel security fixes.
+
+  Tell me which one you want, and I will write the exact commands.
+
+✻ Baked for 13s · done 7:17 PM
+
+❯ How do I choose the defaul kernel, I didn't expect the kernel change after    
+  reboot.                                                                       
+
+● Ubuntu boots the kernel that GRUB (the boot loader) selects. The GRUB_DEFAULT
+  line in /etc/default/grub controls that choice. Its usual value is 0, which
+  means "the first menu entry". The first entry always points to the newest
+  installed kernel, so each reboot after an apt kernel update starts the new
+  kernel. That is what happened today.
+
+  To make GRUB always boot one specific kernel, run these on CN:
+
+  1. Check the current setting and the exact menu entry names (read-only):
+
+  grep ^GRUB_DEFAULT /etc/default/grub
+  grep -E "^\s*(submenu|menuentry) '" /boot/grub/grub.cfg | cut -d"'" -f2
+
+  The second command should list names like Advanced options for Ubuntu and
+  Ubuntu, with Linux 5.15.0-198-generic. GRUB needs these exact names.
+
+  2. Set GRUB_DEFAULT to the kernel you want. This command rewrites only the
+  GRUB_DEFAULT= line in /etc/default/grub. The example uses 5.15.0-198, which is
+  the kernel your rebuilt gtp5g.ko matches:
+
+  sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, 
+  with Linux 5.15.0-198-generic"/' /etc/default/grub
+
+  The > separates the submenu name from the entry name inside that submenu. Copy
+  both names exactly from the output of step 1.
+
+  3. Regenerate GRUB's menu file so the setting takes effect:
+
+  update-grub
+
+  4. Verify:
+
+  grep ^GRUB_DEFAULT /etc/default/grub
+
+  There are two limits to keep in mind.
+
+  - The pin does not stop apt from installing new kernels. It only stops GRUB
+    from booting them by default. When apt installs a newer kernel, it removes
+    older ones it no longer needs. Today it removed -194 in that way. apt does
+    not remove the kernel that is currently running, so -198 is safe while the
+    machine runs on it. If -198 were ever removed, the pinned entry would no
+    longer exist, and GRUB would fall back to the first entry, which is the
+    newest kernel. To fully freeze the kernel, also run apt-mark hold 
+    linux-generic linux-image-generic linux-headers-generic, as I mentioned
+    earlier. The cost is that the machine stops receiving kernel security fixes.
+  - To try a newer kernel once without changing the default, set
+    GRUB_DEFAULT=saved in place of the fixed name, run update-grub, and use
+    grub-set-default "<name>" for the normal kernel and grub-reboot "<name>" for
+    a single boot. Skip this if you only want one fixed kernel.
+
+✻ Worked for 22s · done 7:19 PM
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]#   grep ^GRUB_DEFAULT /etc/default/grub   
+  GRUB_DEFAULT=0                                                                
+  [root@75N0-01N0SA-sled2-CN free5gc]#   grep -E "^\s*(submenu|menuentry) '"    
+  /boot/grub/grub.cfg | cut -d"'" -f2                                           
+  Ubuntu                                                                        
+  Advanced options for Ubuntu                                                   
+  Ubuntu, with Linux 5.15.0-198-generic                                         
+  Ubuntu, with Linux 5.15.0-198-generic (recovery mode)                         
+  Ubuntu, with Linux 5.15.0-185-generic                                         
+  Ubuntu, with Linux 5.15.0-185-generic (recovery mode)                         
+  UEFI Firmware Settings                                                        
+  [root@75N0-01N0SA-sled2-CN free5gc]#   sed -i                                 
+  's/^GRUB_DEFAULT=./GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with     
+  Linux 5.15.0-198-generic"/'                                                   
+  sed: no input files                                                           
+  [root@75N0-01N0SA-sled2-CN free5gc]#   sed -i                                 
+  's/^GRUB_DEFAULT=./GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with     
+  Linux 5.15.0-198-generic"/'   /etc/default/grub                               
+  [root@75N0-01N0SA-sled2-CN free5gc]#   update-grub                            
+  Sourcing file /etc/default/grub' Sourcing file                                
+  /etc/default/grub.d/init-select.cfg'                                          
+  Generating grub configuration file ...                                        
+  Found linux image: /boot/vmlinuz-5.15.0-198-generic                           
+  Found initrd image: /boot/initrd.img-5.15.0-198-generic                       
+  Found linux image: /boot/vmlinuz-5.15.0-185-generic                           
+  Found initrd image: /boot/initrd.img-5.15.0-185-generic                       
+  Warning: os-prober will not be executed to detect other bootable partitions.  
+  Systems on them will not be added to the GRUB boot configuration.             
+  Check GRUB_DISABLE_OS_PROBER documentation entry.                             
+  Adding boot menu entry for UEFI Firmware Settings ...                         
+  done                                                                          
+  [root@75N0-01N0SA-sled2-CN free5gc]#   grep ^GRUB_DEFAULT /etc/default/grub   
+  GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux                  
+  5.15.0-198-generic"                                                           
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+
+● The kernel pin worked.
+
+  - The first sed printed sed: no input files because the file name
+    /etc/default/grub was missing from the end of the command. That run changed
+    nothing. The second run included the file name and changed the line.
+  - grep ^GRUB_DEFAULT now shows GRUB_DEFAULT="Advanced options for 
+    Ubuntu>Ubuntu, with Linux 5.15.0-198-generic".
+  - update-grub found both installed kernels, -198 and -185, and wrote the new
+    menu without errors. The os-prober warning only means GRUB does not look for
+    other operating systems on other disks. It does not affect this setting.
+
+  update-grub also read a second file, /etc/default/grub.d/init-select.cfg. A
+  file in that directory could override GRUB_DEFAULT. To confirm that the
+  generated menu really uses your setting, run this read-only check:
+
+  grep -m1 "set default=" /boot/grub/grub.cfg
+
+  It should print set default="Advanced options for Ubuntu>Ubuntu, with Linux 
+  5.15.0-198-generic". If it prints "0", the other file overrode the setting, so
+  paste it here.
+
+  From now on, a reboot starts 5.15.0-198, which matches the gtp5g.ko you
+  rebuilt today, even after apt installs a newer kernel. The limit from my
+  previous message still applies. If apt ever removes 5.15.0-198, GRUB falls
+  back to the newest kernel. You can prevent that with apt-mark hold.
+
+✻ Brewed for 10s · done 7:20 PM
+
+❯ Also hold the kernel packages with apt-mark                                   
+
+● Run these on CN.
+
+  1. Hold the kernel meta-packages. A meta-package is an empty package that
+  depends on the newest versioned kernel. On this machine, apt installs each new
+  kernel by upgrading linux-generic, linux-image-generic and
+  linux-headers-generic. The apt history showed this in its Upgrade: lines.
+  Holding these three packages stops apt, and the automatic updates done by
+  unattended-upgrades, from pulling in new kernels:
+
+  apt-mark hold linux-generic linux-image-generic linux-headers-generic
+
+  2. Verify that the hold is in place (read-only):
+
+  apt-mark showhold
+
+  It should list the three package names.
+
+  3. Optional check that apt now skips new kernels (read-only, it only simulates
+  an upgrade):
+
+  apt-get -s upgrade | grep -E "kept back|linux-(generic|image|headers)"
+
+  If a newer kernel is available, apt will list the three packages under "kept
+  back". If no output appears, no newer kernel has been released yet.
+
+  The hold also protects 5.15.0-198. apt removes an old kernel only after it
+  installs a newer one, and the hold now stops that install. The GRUB pin and
+  the hold work together. The hold stops new kernels from being installed, and
+  the GRUB pin keeps -198 as the boot kernel even if one is installed by hand.
+
+  To get kernel updates again later, run apt-mark unhold linux-generic 
+  linux-image-generic linux-headers-generic. Then reboot into the new kernel,
+  rebuild gtp5g with make, and update GRUB_DEFAULT to the new kernel name.
+
+✻ Churned for 12s · done 7:21 PM
+
+❯ I think I don have to apply it now, I will need to reboot to change back to   
+  kernel 185 right?                                                             
+
+● No. You do not need to reboot, and nothing changes back to 5.15.0-185.
+
+  - The GRUB pin points to 5.15.0-198, not -185. The machine is already running
+    -198. Your rebuilt gtp5g.ko also matches -198. The pin only makes sure the
+    next reboot starts the same kernel again. It does not switch anything now.
+  - Do not go back to -185. The gtp5g.ko you rebuilt today is built for -198. If
+    you booted -185, insmod would fail with Invalid module format again until
+    you ran make in gtp5g/ once more.
+  - apt-mark hold also needs no reboot. It takes effect as soon as the command
+    finishes. It only changes what apt is allowed to install later.
+
+  Skipping the hold for now is fine. Without it, apt will keep installing newer
+  kernels in the background, but GRUB will still boot -198. apt does not remove
+  the kernel that is currently running. So -198 stays installed as long as the
+  machine is running it, and the pin stays valid.
+
+✻ Cogitated for 9s · done 7:22 PM
+
+❯ But I only run my free5gc on kernel 185 before, I don't know what is this 198 
+  kernel for                                                                    
+
+● 5.15.0-198 is a regular Ubuntu update of the same kernel line that 5.15.0-185
+  belongs to. Both are Ubuntu's 5.15 kernel. The last number is Ubuntu's update
+  counter for that line. It went up over the summer as apt installed -186, -187,
+  -190, -191, -194 and then -198. Each update mostly contains security and bug
+  fixes from Ubuntu. You did not choose to install it. The automatic updates
+  installed it on 2026-10-07, and today's reboot was the first time it ran. To
+  see exactly what changed, run apt changelog linux-image-5.15.0-198-generic on
+  CN.
+
+  free5gc itself does not care which 5.15 kernel is running. The only part tied
+  to the kernel version is gtp5g.ko, and you already rebuilt it for -198. Your
+  log from 19:12 shows that the UPF works on -198: it reported Kernel reports 
+  IPv6 data path support: true and then UPF started.
+
+  You can choose either kernel.
+
+  Stay on -198, which is the current setup. Nothing else is needed. The setup is
+  untested on -198 beyond the UPF start-up, so if something behaves differently
+  from before the reboot, keep the kernel change in mind as a possible cause.
+
+  Go back to -185, the kernel you tested on before. Run these on CN:
+
+  # 1. Check that the kernel headers for -185 are still installed (needed to 
+  rebuild gtp5g)
+  ls /lib/modules/5.15.0-185-generic/build
+
+  # 2. Point GRUB at -185 and regenerate its menu
+  sed -i 's/^GRUB_DEFAULT=.*/GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, 
+  with Linux 5.15.0-185-generic"/' /etc/default/grub
+  update-grub
+
+  # 3. Reboot into -185
+  reboot
+
+  # 4. After the reboot: confirm the kernel, then rebuild gtp5g for it
+  uname -r
+  cd /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g && make clean && make
+
+  Then run run_free5gc as usual.
+
+  If step 1 reports that the directory does not exist, stop there. Without the
+  -185 headers, gtp5g cannot be built for -185. In that case staying on -198 is
+  simpler. If you do go back to -185, also run the apt-mark hold from earlier.
+  Without the hold, the next automatic kernel install could remove -185, because
+  it would no longer be the running kernel at that point.
+
+✻ Sautéed for 15s · done 7:23 PM
+❯ But I already change my default kernel, right? so after reboot, I will have   
+  to rebuilt again.                                                             
+
+● No. If you keep the current setting, you will not need to rebuild after a
+  reboot.
+
+  - You set the default kernel to 5.15.0-198.
+  - The machine is running 5.15.0-198 right now.
+  - The gtp5g.ko you rebuilt today was built for 5.15.0-198.
+
+  All three match. After a reboot, GRUB starts -198 again, the same kernel as
+  now. Then run_free5gc loads the same gtp5g.ko without errors.
+
+  You need to rebuild only when the kernel you boot is different from the one
+  gtp5g.ko was built for. With your current setting, that happens in two cases:
+
+  - You change GRUB_DEFAULT to -185, or to any other kernel.
+  - apt removes -198 someday, and GRUB falls back to the newest kernel. As
+    explained earlier, this cannot happen while -198 is the running kernel.
+
+✻ Crunched for 6s · done 7:24 PM
+
+❯ Are you sure 198 will impact my free5gc?                                      
+
+● No. I am not sure either way. I did not say that -198 will affect free5gc. I
+  said that it has not been tested beyond the UPF starting up.
+
+  The evidence so far:
+
+  - Verified on -198: gtp5g.ko loads with ipv6_data_path=1. The UPF creates the
+    upfgtp interface. The UPF reports IPv6 data path support: true, adds every
+    DNN route, and starts its PFCP server. Your 19:12 log shows all of this.
+  - Not verified on -198 yet: UE registration, PDU session setup, and user-plane
+    traffic through gtp5g, which is the IPv4 and IPv6 ping.
+
+  The kernel change can only reach free5gc through gtp5g, because gtp5g is the
+  only part of free5gc that runs inside the kernel. The other network functions
+  (AMF, SMF and the rest) are normal programs, and a kernel update within 5.15
+  is very unlikely to affect them. Even for gtp5g, I have no evidence that -198
+  behaves differently from -185. I also have no evidence that it behaves the
+  same.
+
+  The way to find out is to run your usual test now: register the UE, set up a
+  PDU session, and ping over it. If that works as it did before the reboot, -198
+  is fine for your setup. If something fails, the kernel change is one of the
+  possible causes to check, along with the others.
+
+✻ Cooked for 9s · done 7:24 PM
+
+❯ I do not have time to verify                                                  
+
+● That's fine. Nothing else needs to be done now. The current setup is
+  consistent: CN runs 5.15.0-198, GRUB boots -198 after a reboot, and gtp5g.ko
+  is built for -198. The UPF starts correctly with that combination.
+
+  If something behaves differently from before during your normal work, remember
+  one fact: on 2026-10-12 the CN kernel changed from 5.15.0-185 to 5.15.0-198.
+  All your earlier testing was on -185.
+
+  I'll save that fact to my memory, so I can point to it in a later session if a
+  data-plane problem comes up. This writes one new memory file and adds one
+  line to the MEMORY.md index.
+
+  Wrote 1 memory (ctrl+o to expand)
+
+● Next, this edit adds one pointer line for the new memory to the MEMORY.md
+  index.
+
+  Wrote 1 memory (ctrl+o to expand)
+
+● That's fine, you don't need to test it now. CN is in a stable state:
+
+  - CN is running 5.15.0-198.
+  - GRUB will boot -198 again after any reboot.
+  - gtp5g.ko is built for -198, so run_free5gc will not need a rebuild.
+  - The UPF starts correctly on this kernel.
+
+  I saved one fact in memory: on 2026-10-12 the CN kernel changed from
+  5.15.0-185 to 5.15.0-198, and all your earlier testing was on -185. The memory
+  file also records that the apt-mark hold was offered but not applied. If a UE
+  data-plane problem shows up later, I'll list this kernel change as a possible
+  cause.
+
+✻ Baked for 27s · done 7:25 PM
+
+❯ Edit my command to check kernel version :                                     
+  run_free5gc(){                                                                
+      insmod /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g/gtp5g.ko        
+  ipv6_data_path=1                                                              
+      /home/wnc/Downloads/free5gc_$free5gc_ver/free5gc/run.sh -cp -dp 2>&1 |    
+  tee /home/wnc/Downloads/free5gc_$free5gc_ver/free5gc/log/console_free5gc.log  
+  }                                                                             
+  So next time after I reboot, I will get notify to rebuild gtp5g if kernel     
+  changed.                                                                      
+
+● Here is the new run_free5gc. Before it loads gtp5g.ko, it reads the kernel
+  version stored inside gtp5g.ko (its vermagic) and compares it with the running
+  kernel (uname -r). If the two differ, it prints which kernel each one is,
+  prints the rebuild command, and stops before starting free5gc. If they match,
+  it runs exactly the same two lines as before.
+
+  run_free5gc(){
+      local gtp5g_ko=/home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g/gtp5g.ko
+      local running_kernel=$(uname -r)
+      if [ ! -f "$gtp5g_ko" ]; then
+          echo "run_free5gc: $gtp5g_ko does not exist. Build gtp5g first:"
+          echo "    cd $(dirname "$gtp5g_ko") && make clean && make"
+          return 1
+      fi
+      local built_kernel=$(modinfo -F vermagic "$gtp5g_ko" | awk '{print $1}')
+      if [ "$built_kernel" != "$running_kernel" ]; then
+          echo "run_free5gc: gtp5g.ko was built for kernel $built_kernel, but
+  the running kernel is $running_kernel."
+          echo "Rebuild gtp5g first:"
+          echo "    cd $(dirname "$gtp5g_ko") && make clean && make"
+          return 1
+      fi
+      insmod "$gtp5g_ko" ipv6_data_path=1
+      /home/wnc/Downloads/free5gc_$free5gc_ver/free5gc/run.sh -cp -dp 2>&1 | tee
+  /home/wnc/Downloads/free5gc_$free5gc_ver/free5gc/log/console_free5gc.log
+  }
+
+  The vermagic value looks like 5.15.0-198-generic SMP mod_unload modversions.
+  awk '{print $1}' keeps only the first word, which is the kernel version. That
+  word is the same text that uname -r prints.
+
+  To install it on CN:
+
+  1. Open ~/.bashrc, replace the old run_free5gc(){ ... } block with the one
+     above, and save.
+  2. Load the new version into your current shell:
+  source ~/.bashrc
+  3. Check that the shell now has the new version:
+  type run_free5gc
+  4. Check the value the comparison will use. Right now it should print
+     5.15.0-198-generic, the same as uname -r:
+  modinfo -F vermagic
+  /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g/gtp5g.ko | awk '{print $1}'
+
+  After a reboot onto a different kernel, run_free5gc will print something like
+  this and stop:
+
+  run_free5gc: gtp5g.ko was built for kernel 5.15.0-198-generic, but the running
+  kernel is 5.15.0-201-generic.
+  Rebuild gtp5g first:
+      cd /home/wnc/Downloads/free5gc_use_open5gs_ipv6/gtp5g && make clean && 
+  make
+
+  After you run the rebuild command, run run_free5gc again and it will start
+  normally.
+
+  The function still runs insmod every time. If gtp5g is already loaded, you
+  will still see the harmless insmod: ... File exists line, the same as before.
+
+✻ Churned for 19s · done 7:27 PM
+
+※ recap: You're getting free5gc running again on CN after the reboot moved it onto kernel 5.15.0-198, and I've given you a new run_free5gc that checks the kernel version first. Next, replace the old function in CN's ~/.bashrc and run source ~/.bashrc. (disable recaps in /config)

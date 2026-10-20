@@ -1,0 +1,998 @@
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc
+
+
+❯ Help me check the syntex error on /home/loren/Downloads/source_code/free5gc_u 
+  se_open5gs_ipv6/free5gc/config/pcfcfg_ue_policy_tmo_del.yaml                  
+                                                                                
+  This is used to send to UE to delete UE stored pcfcfg_ue_policy_tmo.yaml      
+
+● I will read the delete file and the original pcfcfg_ue_policy_tmo.yaml so I
+  can compare the two, and then run a YAML parser on the delete file.
+
+  Read 2 files (ctrl+o to expand)
+
+● Bash(python3 -c "import yaml,sys;
+      yaml.safe_load(open('config/pcfcfg_ue_policy_tmo_del.yaml')); print('YAML
+      OK')")
+  ⎿  YAML OK
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● I will read the PCF copy of the loader and the encoder
+  (NFs/pcf/internal/policy/ue_policy.go) to see how an instruction with no
+  policy parts gets encoded.
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+● Write(NFs/pcf/internal/policy/tmp_del_test.go)
+  ⎿  Wrote 18 lines to NFs/pcf/internal/policy/tmp_del_test.go
+       1 package policy
+       2 
+       3 import (
+       4   "encoding/hex"
+       5   "testing"
+       7 
+       8 func TestTmpDelEncoding(t *testing.T) {
+       9   cfg, err := LoadUEPolicyConfigFromYAML("../../../../config/pcf
+         cfg_ue_policy_tmo_del.yaml")
+      10   if err != nil {
+     … +9 lines (ctrl+o to expand)
+
+● I will run the temporary test, and then delete tmp_del_test.go in the same
+  command.
+
+● Bash(cd
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/pcf
+      && go test ./internal/policy/ -run TestTmpDelEncoding -v 2>&1 | grep -E
+      "HEX|FAIL|…)
+  ⎿      tmp_del_test.go:17: HEX 800100130011130062000507d100010100050bb900
+     0101
+     ok         github.com/free5gc/pcf/internal/policy  0.004s
+     … +3 lines (ctrl+o to expand)
+
+● Result: the YAML syntax is fine, but the file does not produce a delete 
+  command
+
+  1. YAML syntax: no error
+
+  python3 yaml.safe_load parsed config/pcfcfg_ue_policy_tmo_del.yaml without
+  error. Every key in the file (policySectionManagementList, plmnId, mcc, mnc,
+  instructions, upsc, policyParts) also matches a yaml: tag in the Go structs in
+  NFs/pcf/internal/policy/ue_policy.go:79-96. The AMF copy in
+  NFs/amf/internal/policy/ue_policy.go has the same structs.
+
+  2. The real problem: policyParts: [] is not encoded as an empty section
+
+  To check this, I added a temporary test that loads the file through
+  LoadUEPolicyConfigFromYAML and runs BuildManageUEPolicyCommand, the function
+  that builds the MANAGE UE POLICY COMMAND bytes. I deleted the test after the
+  run. The output was:
+
+  80 01 0013 0011 130062  0005 07d1 0001 01   0005 0bb9 0001 01
+  PTI  type list sublist PLMN  |-- UPSC 2001 --|  |-- UPSC 3001 --|
+
+  Each instruction contains its UPSC (UE Policy Section Code, the 2-byte section
+  identifier) followed by 0001 01. Those 3 bytes are one UE policy part with
+  length 1 and type URSP (UE Route Selection Policy), holding zero rules. That
+  is an empty URSP part, not an empty section. The cause is
+  convertYAMLToInternalConfig at NFs/pcf/internal/policy/ue_policy.go:214 (and
+  NFs/amf/internal/policy/ue_policy.go:274). That line always creates
+  PolicyPart: UEPolicyPartConfig{Type: 1}, even when policyParts is empty.
+  buildInstruction then always writes the part length and the type byte.
+
+  What this probably does on the UE: the UE treats the instruction as "replace
+  section 3001 with a URSP part that has no rules". The UE may keep the UPSI
+  (PLMN ID + UPSC) stored, so step 4 of your VERIFY list (UPSC: 0x0bb9
+  disappears) would fail. The UE may also answer with MANAGE UE POLICY COMMAND
+  REJECT, because a URSP part with no rules is unusual. I have not tested this
+  on the UE.
+
+  For a delete, each instruction should hold only the UPSC. The expected bytes
+  are:
+  80 01 000d 000b 130062  0002 07d1  0002 0bb9
+
+  3. A wrong filename in the comments
+
+  Line 26 says ln -sfn pcfcfg_ue_policy_del.yaml ..., but the file is named
+  pcfcfg_ue_policy_tmo_del.yaml. If you run that line as written,
+  pcfcfg_ue_policy_wnc.yaml becomes a broken symlink. The AMF and PCF then fall
+  back to QXDMPolicyConfig (PLMN 001/01, match-all).
+
+  Two smaller notes:
+  - Lines 19-22 (the "UNVERIFIED" comment) can now be replaced with the finding
+    from section 2.
+  - config/pcfcfg_ue_policy_wnc.yaml currently points to
+    pcfcfg_ue_policy_46611.yaml, not to pcfcfg_ue_policy_tmo.yaml. The RESTORE
+    line (line 41) would therefore switch the active policy to T-Mobile instead
+    of restoring 46611.
+
+  ★ Insight ─────────────────────────────────────
+  - A valid YAML file only proves that the parser accepted it. The meaning comes
+    from convertYAMLToInternalConfig, which fills in defaults. The Type: 1
+    default is the reason an empty list still produces a URSP part.
+  - In the UE policy section management list, every level carries a 2-byte
+    length (list, sublist, instruction, part). An instruction with length 0002
+    therefore contains exactly the UPSC and nothing else. That is the delete
+    form.
+  - The AMF and PCF each keep their own copy of this encoder (see the
+    DUPLICATION NOTICE at the top of the PCF file), so a fix has to go into both
+    copies.
+    ─────────────────────────────────────────────────
+
+  I have not changed anything. Do you want me to make the fix? It would change
+  both copies of convertYAMLToInternalConfig and buildInstruction so that an
+  instruction with an empty policyParts list is encoded as the UPSC only. It
+  would also fix the filename on line 26 and update the comments, and add a test
+  that checks the 0002 0bb9 bytes.
+
+✻ Cogitated for 1m 7s · done Thursday 5:57 PM
+
+❯ "fix in both AMF and PCF" what are you going to fix??                         
+                                                                                
+  I was told that to erease a UE stored NW URSP,                                
+  the command must still carry the UPSC. Deletion does not use a separate       
+  message or a separate "delete" flag. It is                                    
+    a normal instruction that names the section, with nothing in it:            
+                                                                                
+    ┌────────────────────────────┬───────────────────────────────────┬───────── 
+  ──────────────────────────────┐                                               
+    │  Part of the instruction   │ Install (today's T-Mobile policy) │          
+        Delete                 │                                                
+    ├────────────────────────────┼───────────────────────────────────┼───────── 
+  ──────────────────────────────┤                                               
+    │ PLMN ID, in the sublist    │ 310 / 260                         │ 310 /    
+  260                             │                                             
+    ├────────────────────────────┼───────────────────────────────────┼───────── 
+  ──────────────────────────────┤                                               
+    │ UPSC                       │ 3001                              │ 3001,    
+  which identifies what to delete │                                             
+    ├────────────────────────────┼───────────────────────────────────┼───────── 
+  ──────────────────────────────┤                                               
+    │ UE policy section contents │ the three URSP rules              │ empty    
+                               │                                                
+    └────────────────────────────┴───────────────────────────────────┴───────── 
+  ──────────────────────────────┘                                               
+
+● What the fix would change
+
+  The text you pasted and my finding say the same thing. A delete instruction
+  carries the PLMN ID and the UPSC (UE Policy Section Code), and its UE policy 
+  section contents must be empty. Your YAML file already asks for that, because
+  it sets policyParts: []. The problem is that the free5GC encoder does not send
+  what the YAML asks for. It puts something into the contents.
+
+  Here are the bytes the encoder builds today for UPSC 3001, compared with what
+  the pasted text requires:
+
+  ┌────────────────────┬──────────────────────────────────┬────────────────┐
+  │    Part of the     │         Bytes sent today         │  Bytes for a   │
+  │    instruction     │                                  │  real delete   │
+  ├────────────────────┼──────────────────────────────────┼────────────────┤
+  │ Instruction length │ 0005                             │ 0002           │
+  ├────────────────────┼──────────────────────────────────┼────────────────┤
+  │ UPSC               │ 0bb9 (3001)                      │ 0bb9 (3001)    │
+  ├────────────────────┼──────────────────────────────────┼────────────────┤
+  │ UE policy section  │ 0001 01: one UE policy part,     │ nothing        │
+  │ contents           │ length 1, type URSP, zero rules  │                │
+  └────────────────────┴──────────────────────────────────┴────────────────┘
+
+  The contents are not empty today. 0001 01 is a URSP part that holds no rules.
+  The UE can read that as "replace section 3001 with an empty URSP list" rather
+  than "delete section 3001". In that case the UE would keep reporting UPSC: 
+  0x0bb9.
+
+  Why the encoder adds those 3 bytes
+
+  convertYAMLToInternalConfig creates every instruction with PolicyPart: 
+  UEPolicyPartConfig{Type: 1}, even when policyParts is empty. Then
+  buildInstruction always writes a part length and a type byte after the UPSC.
+  The same code is in two copies:
+  - NFs/amf/internal/policy/ue_policy.go:274, used by the AMF
+  - NFs/pcf/internal/policy/ue_policy.go:214, used by the PCF
+
+  The path the policy takes from your config decides which copy builds the
+  message, so both copies need the same change.
+
+  The change, in both files
+
+  1. convertYAMLToInternalConfig: if an instruction's policyParts list is empty,
+     leave PolicyPart.Type at 0 instead of setting it to 1. Type 0 is reserved
+     in TS 24.501 (1 = URSP, 2 = ANDSP), so a real policy part never has type 0.
+     That makes 0 safe to mean "this instruction has no policy part".
+  2. buildInstruction: if PolicyPart.Type is 0, write only the 2-byte UPSC. Skip
+     the part length and the type byte. The instruction length then comes out
+     as 0002.
+  3. A new test in each package: load pcfcfg_ue_policy_tmo_del.yaml and check
+     that the output is 80 01 000d 000b 130062 0002 07d1 0002 0bb9.
+
+  Instructions that do have policy parts are not affected. The existing test
+  TestBuildManageUEPolicyCommand_TMobile checks the T-Mobile install message
+  byte for byte, and it should still pass.
+
+  The change in the YAML file
+
+  - On line 26, change pcfcfg_ue_policy_del.yaml to
+    pcfcfg_ue_policy_tmo_del.yaml.
+  - Replace the "UNVERIFIED" comment on lines 19-22 with what the encoder now
+    does.
+
+  Do you want me to go ahead with this?
+
+✻ Churned for 16s · done Thursday 6:04 PM
+
+❯ OK, just make sure it won't impact the existed pcfcfg_ue_policy_tmo.yaml/     
+  pcfcfg_ue_policy_00101.yaml, then fix both AMF and PCF                        
+
+● Before editing, I will record the bytes that both encoders produce today for
+  every existing policy file. After the fix I can compare them byte for byte.
+  First I will read the existing tests and the AMF encoder so I know their exact
+  shape.
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc &&
+      ls NFs/amf/internal/policy/ NFs/pcf/internal/policy/ && grep -n "func
+      Test\|LoadUEPolic…)
+  ⎿  NFs/amf/internal/policy/:
+     ue_policy_00101_test.go
+     ue_policy.go
+     … +67 lines (ctrl+o to expand)
+
+● Write(NFs/pcf/internal/policy/tmp_baseline_test.go)
+  ⎿  User rejected write to NFs/pcf/internal/policy/tmp_baseline_test.go
+       1 package policy
+       2 
+       3 import (
+       4   "encoding/hex"
+       5   "os"
+       6   "testing"
+       7 )
+       8 
+       9 func TestTmpBaseline(t *testing.T) {
+      10   out := ""
+     … +16 lines
+
+✻ Crunched for 16s · done Thursday 6:07 PM
+
+❯ Continue                                                                      
+
+● Bash(cd
+      /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs/amf
+      && go test ./internal/policy/ -v 2>&1 | grep -E "^(=== RUN|---
+      |ok|FAIL|PASS)"; cd…)
+  ⎿  === RUN   TestBuildManageUEPolicyCommand_00101
+     --- FAIL: TestBuildManageUEPolicyCommand_00101 (0.00s)
+     === RUN   TestPLMN00101IsPurePLMNSwapOfTMobile
+     … +15 lines (ctrl+o to expand)
+
+● The two byte-for-byte tests already fail before any edit, in both the AMF and
+  the PCF. I will print the failure messages to find out why.
+
+● Bash(go test ./internal/policy/ -run 'TestBuildManageUEPolicyCommand_TMobile|T
+      estBuildManageUEPolicyCommand_00101' -v 2>&1 | grep -vE "^\s*$|INFO" |
+      head -40; cd ../…)
+  ⎿  === RUN   TestBuildManageUEPolicyCommand_00101
+         ue_policy_00101_test.go:41: payload mismatch
+              want (170): 800100a600a400f110009f07d1009b01004a0100240897a49
+     … +58 lines (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs
+      && for nf in amf pcf; do (cd $nf && go test ./internal/policy/ -v 2>&1 |
+      grep -E "^\s+…)
+  ⎿  5 /tmp/ue_policy_amf_before.txt
+     5 /tmp/ue_policy_pcf_before.txt
+     AMF and PCF produce identical bytes
+
+● The baseline is saved. Before editing, I will read the two AMF regions to be
+  changed so I can match their exact whitespace. The AMF file has tab-only blank
+  lines.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(NFs/amf/internal/policy/ue_policy.go)
+  ⎿  Added 8 lines, removed 2 lines
+      270    // Convert instructions
+      271    for _, instruction := range plmnSublist.Instructions {
+      272      internalInstruction := InstructionConfig{
+      273 -      UPSC:       instruction.UPSC,                           
+      274 -      PolicyPart: UEPolicyPartConfig{Type: 1}, // URSP        
+      273 +      UPSC: instruction.UPSC,                                 
+      274      }
+      275 +    // WNC: an instruction with no policyParts deletes the UE 
+          +policy section named by                                       
+      276 +    // its UPSC (TS 24.501 Annex D). PolicyPart.Type stays 0 (
+          +a reserved part type) so                                      
+      277 +    // buildInstruction encodes the UPSC only, with empty UE p
+          +olicy section contents.                                       
+      278 +    if len(instruction.PolicyParts) > 0 {                     
+      279 +      // URSP                                                 
+      280 +      internalInstruction.PolicyPart.Type = 1                 
+      281 +    }                                                         
+      282      
+      283      // Convert policy parts
+      284      for _, policyPart := range instruction.PolicyParts {
+
+● Update(NFs/amf/internal/policy/ue_policy.go)  ⎿  Added 7 lines, removed 1 line
+      461    upsc := uint16(instruction.UPSC)
+      462    payload = append(payload, uint8(upsc>>8))
+      463    payload = append(payload, uint8(upsc))
+      464 -                                                              
+      464 +                                                              
+      465 +  // WNC: Type 0 means the YAML instruction had no policyParts
+          +. Empty UE policy section                                     
+      466 +  // contents tell the UE to delete the section identified by 
+          +PLMN ID + UPSC.                                               
+      467 +  if instruction.PolicyPart.Type == 0 {                       
+      468 +    return payload, nil                                       
+      469 +  }                                                           
+      470 +                                                              
+      471    // Build UE policy part
+      472    policyPartPayload, err := buildUEPolicyPart(&instruction.Pol
+           icyPart)
+      473    if err != nil {
+
+● Update(NFs/pcf/internal/policy/ue_policy.go)
+  ⎿  Added 8 lines, removed 2 lines
+      210    // Convert instructions
+      211    for _, instruction := range plmnSublist.Instructions {
+      212      internalInstruction := InstructionConfig{
+      213 -      UPSC:       instruction.UPSC,                           
+      214 -      PolicyPart: UEPolicyPartConfig{Type: 1}, // URSP        
+      213 +      UPSC: instruction.UPSC,                                 
+      214      }
+      215 +    // WNC: an instruction with no policyParts deletes the UE 
+          +policy section named by                                       
+      216 +    // its UPSC (TS 24.501 Annex D). PolicyPart.Type stays 0 (
+          +a reserved part type) so                                      
+      217 +    // buildInstruction encodes the UPSC only, with empty UE p
+          +olicy section contents.                                       
+      218 +    if len(instruction.PolicyParts) > 0 {                     
+      219 +      // URSP                                                 
+      220 +      internalInstruction.PolicyPart.Type = 1                 
+      221 +    }                                                         
+      222  
+      223      // Convert policy parts
+      224      for _, policyPart := range instruction.PolicyParts {
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Update(NFs/pcf/internal/policy/ue_policy.go)
+  ⎿  Added 6 lines
+      402    payload = append(payload, uint8(upsc>>8))
+      403    payload = append(payload, uint8(upsc))
+      404  
+      405 +  // WNC: Type 0 means the YAML instruction had no policyParts
+          +. Empty UE policy section                                     
+      406 +  // contents tell the UE to delete the section identified by 
+          +PLMN ID + UPSC.                                               
+      407 +  if instruction.PolicyPart.Type == 0 {                       
+      408 +    return payload, nil                                       
+      409 +  }                                                           
+      410 +                                                              
+      411    // Build UE policy part
+      412    policyPartPayload, err := buildUEPolicyPart(&instruction.Pol
+           icyPart)
+      413    if err != nil {
+
+● Next I will add the delete test from the plan. I will read the existing PCF
+  T-Mobile test first so the new test follows the same style.
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Write(NFs/pcf/internal/policy/ue_policy_tmo_del_test.go)
+  ⎿  Wrote 42 lines to NFs/pcf/internal/policy/ue_policy_tmo_del_test.go
+       1 package policy
+       2 
+       4   "encoding/hex"
+       5   "testing"
+       6 )
+       8 // Expected "Manage UE Policy Command" payload for config/pcfcfg
+         _ue_policy_tmo_del.yaml.
+       9 // Each instruction in that file has an empty policyParts list, 
+      10 // the UE policy section named by PLMN 310260 + UPSC. The instru
+         ction must therefore hold
+     … +39 lines (ctrl+o to expand)
+
+● The hex constant is split in an odd place, which makes it hard to read. I will
+  replace it with one plain string. The value stays the same.
+
+● Update(NFs/pcf/internal/policy/ue_policy_tmo_del_test.go)
+  ⎿  Added 1 line, removed 1 line
+      17  //      130062    PLMN 310260
+      18  //      0002 07d1 instruction: UPSC 2001, empty contents
+      19  //      0002 0bb9 instruction: UPSC 3001, empty contents
+      20 -const tmobileDeleteReferenceHex = "8001000d000b13006200020" + "
+         -7d100020bb9"                                                   
+      20 +const tmobileDeleteReferenceHex = "8001000d000b130062000207d100
+         +020bb9"                                                        
+      21  
+      22  func TestBuildManageUEPolicyCommand_TMobileDelete(t *testing.T)
+           {
+      23    want, err := hex.DecodeString(tmobileDeleteReferenceHex)
+
+● Bash(cp /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs
+      /pcf/internal/policy/ue_policy_tmo_del_test.go
+      /home/loren/Downloads/source_code/free5g…)
+  ⎿  Done
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+● Bash(for nf in amf pcf; do echo "== $nf"; (cd $nf && gofmt -l
+      internal/policy/; go vet ./internal/policy/ && go test ./internal/policy/
+      -v 2>&1 | tee /tmp/ue_policy_…)
+  ⎿  == amf
+     internal/policy/ue_policy.go
+     internal/policy/ue_policy_tmobile_test.go
+     … +17 lines (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc &&
+      for f in ue_policy.go ue_policy_tmobile_test.go; do git -C NFs/amf show
+      HEAD:internal/p…)
+  ⎿  <standard input>
+     HEAD ue_policy.go already not gofmt-clean
+     <standard input>
+     … +15 lines (ctrl+o to expand)
+
+● Update(config/pcfcfg_ue_policy_tmo_del.yaml)
+  ⎿  Added 5 lines, removed 4 lines
+      16  #     this instruction is expected to delete nothing. MediaTek'
+          s answer says the UE deletes
+      17  #     only when the UPSI already exists.
+      18  #
+      19 -# UNVERIFIED: the core's YAML parser (convertYAMLToInternalConf
+         -ig) was not available when                                     
+      20 -# this file was written, so it is not known how the core encode
+         -s an instruction with an                                       
+      21 -# empty policyParts list. It may encode the correct empty secti
+         -on, reject the file, or skip                                   
+      22 -# the instruction. Check the air trace before relying on it (se
+         -e VERIFY below).                                               
+      19 +# ENCODING: convertYAMLToInternalConfig and buildInstruction (A
+         +MF and PCF copies of                                           
+      20 +# internal/policy/ue_policy.go) encode an instruction with an e
+         +mpty policyParts list as the                                   
+      21 +# 2-byte UPSC only, with instruction length 0x0002 and no UE po
+         +licy part. This file encodes to                                
+      22 +#   80 01 000d 000b 130062 0002 07d1 0002 0bb9                 
+      23 +# which TestBuildManageUEPolicyCommand_TMobileDelete checks in 
+         +both packages.                                                 
+      24  #
+      25  # ACTIVATE (the AMF and PCF load ./config/pcfcfg_ue_policy_wnc.
+          yaml, per the comment in
+      26  # pcfcfg_ue_policy_00101.yaml):
+
+● YAML edit 2: In the ACTIVATE command, I will change pcfcfg_ue_policy_del.yaml,
+  a file that does not exist, to pcfcfg_ue_policy_tmo_del.yaml.
+
+● Update(config/pcfcfg_ue_policy_tmo_del.yaml)
+  ⎿  Added 1 line, removed 1 line
+      24  #
+      25  # ACTIVATE (the AMF and PCF load ./config/pcfcfg_ue_policy_wnc.
+          yaml, per the comment in
+      26  # pcfcfg_ue_policy_00101.yaml):
+      27 -#   ln -sfn pcfcfg_ue_policy_del.yaml config/pcfcfg_ue_policy_w
+         -nc.yaml                                                        
+      27 +#   ln -sfn pcfcfg_ue_policy_tmo_del.yaml config/pcfcfg_ue_poli
+         +cy_wnc.yaml                                                    
+      28  # then restart the NFs that load it, and make the UE register a
+          gain (AT+CFUN=0, AT+CFUN=1).
+      29  #
+      30  # VERIFY, in this order:
+
+● Finally, I will re-run the delete test in both packages to confirm the YAML
+  edits only changed comments. I will also grep the comments I added for
+  we/us/our, as your CLAUDE.md requires.
+
+● Bash(for nf in amf pcf; do (cd NFs/$nf && go test ./internal/policy/ -run
+      TMobileDelete 2>&1 | tail -1); done; git -C NFs/amf diff -U0
+      internal/policy/ue_policy.go;…)
+  ⎿  ok         github.com/free5gc/amf/internal/policy  0.004s
+     ok         github.com/free5gc/pcf/internal/policy  0.004s
+     diff --git a/internal/policy/ue_policy.go b/internal/policy/ue_policy.
+     … +24 lines (ctrl+o to expand)
+
+● The fix is in both the AMF and the PCF, and pcfcfg_ue_policy_tmo.yaml and
+  pcfcfg_ue_policy_00101.yaml still encode to exactly the same bytes as before.
+
+  How I checked that: I saved the bytes both encoders built from those two files
+  before editing, ran the tests again after the edit, and the output was
+  identical. Only pcfcfg_ue_policy_tmo_del.yaml has policyParts: [] (an empty
+  list), so it is the only file whose bytes change. Every other config,
+  including pcfcfg_ue_policy_46611.yaml (the one pcfcfg_ue_policy_wnc.yaml
+  points to now), goes through the encoder the same way as before.
+
+  What changed:
+
+  File: NFs/amf/internal/policy/ue_policy.go and
+  NFs/pcf/internal/policy/ue_policy.go
+  Change: convertYAMLToInternalConfig now marks an instruction as URSP only when
+
+  it has at least one policy part. buildInstruction writes only the UPSC when
+  an instruction has no policy part.
+  ────────────────────────────────────────
+  File: NFs/amf/internal/policy/ue_policy_tmo_del_test.go and the same file
+  under
+  NFs/pcf/
+  Change: New test TestBuildManageUEPolicyCommand_TMobileDelete. It checks that
+  the delete file encodes to 80 01 000d 000b 130062 0002 07d1 0002 0bb9. It
+  passes in both packages.
+  ────────────────────────────────────────
+  File: config/pcfcfg_ue_policy_tmo_del.yaml
+  Change: The ACTIVATE command now uses the correct file name,
+  pcfcfg_ue_policy_tmo_del.yaml. The "UNVERIFIED" comment now describes the
+  real encoding.
+
+  In those bytes, each instruction is now 0002 followed by its UPSC (2001 is
+  07d1, 3001 is 0bb9). That is the form your pasted text describes: the PLMN ID
+  and UPSC with nothing after them. The old 0001 01 (an empty URSP part) is
+  gone.
+
+  Two tests were already failing before any edit, and still fail:
+  TestBuildManageUEPolicyCommand_TMobile and
+  TestBuildManageUEPolicyCommand_00101, in both the AMF and the PCF. Your
+  uncommitted edits to pcfcfg_ue_policy_tmo.yaml changed upsc from 2001 to 3001
+  and added Rule 3 (PRIORITIZE_GAMING), but the bytes the tests expect still
+  match the old file. I did not touch those tests. Tell me if you want their
+  expected bytes updated to match the current YAML.
+
+  Still to do:
+  - Rebuild: I ran only the policy tests. You still need make amf pcf.
+  - Test on the UE: the result on the UE is not tested. Follow the VERIFY steps
+    in the YAML file. The key check is that UPSC: 0x0bb9 is gone from the UE
+    STATE INDICATION at the next registration.
+
+  Nothing is committed.
+
+  ★ Insight ─────────────────────────────────────
+  - Type 0 works as the "delete" marker because TS 24.501 reserves policy part
+    type 0. Real parts are 1 (URSP), 2 (ANDSP) and higher, so a real policy part
+    can never be mistaken for a delete.
+  - The byte-for-byte tests caught nothing here because they were already out of
+    date. Comparing the bytes before and after the edit was the guard that
+    actually checked tmo and 00101.
+    ─────────────────────────────────────────────────
+
+✻ Churned for 2m 20s · done Thursday 6:40 PM
+
+❯ update the stale test expected bytes too                                      
+
+● I will read the two 00101 tests and the AMF T-Mobile test. Then I can see how
+  each one stores its expected bytes and what its comments claim.
+
+  Read 1 file (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs
+      && diff amf/internal/policy/ue_policy_00101_test.go
+      pcf/internal/policy/ue_policy_0010…)
+  ⎿  9,12c9,11
+     < // real T-Mobile US network via QXDM. Source:
+     < //   .../test33-.../qxdm-Manage-UE-Policy-Command-Message-raw-data.l
+     … +33 lines (ctrl+o to expand)
+
+● Bash(python3 - <<'PY'
+      import re…)
+  ⎿  245 800100f100ef00f11000ea0b
+     "800100f100ef00f11000ea0bb900e601004a0100240897a498e3fc925c9489860333d
+     06e4e47125052494f524954" +
+     … +15 lines (ctrl+o to expand)
+
+● Update(NFs/pcf/internal/policy/ue_policy_tmobile_test.go)
+  ⎿  Added 15 lines, removed 7 lines
+       5    "testing"
+       6  )
+       7  
+       8 -// Reference "Manage UE Policy Command" payload (PTI onward, 17
+         -0 bytes) captured from a                                       
+       9 -// real T-Mobile US network via QXDM. This is the exact byte st
+         -ring                                                           
+      10 -// BuildManageUEPolicyCommand must produce from config/pcfcfg_u
+         -e_policy_tmo.yaml so that                                      
+       8 +// Reference "Manage UE Policy Command" payload (PTI onward, 24
+         +5 bytes) that                                                  
+       9 +// BuildManageUEPolicyCommand must produce from config/pcfcfg_u
+         +e_policy_tmo.yaml, so that                                     
+      10  // the PCF delivers the intended URSP instead of an empty comma
+          nd.
+      11  //
+      12 +// The payload started as a 170-byte capture from a real T-Mobi
+         +le US network via QXDM.                                        
+      13 +// The YAML file has since been changed in three ways, and thes
+         +e bytes follow the YAML file:                                  
+      14 +//   - UPSC 3001 (0b b9) instead of the capture's 2001 (07 d1).
+      15 +//   - Rule 3 added: PRIORITIZE_GAMING -> S-NSSAI 1-000bb9.    
+      16 +//   - Each route selection descriptor ends 08 03 (PDUSessionTy
+         +pe IPv4v6) instead of the                                      
+      17 +//     capture's 08 02 (IPv6-only). See the commit 66c5eb8 note
+         + in ue_policy_00101_test.go.                                   
+      18 +//                                                             
+      19  // Load the _tmo variant by name, NOT the pcfcfg_ue_policy_wnc.
+          yaml symlink: that symlink
+      20  // is the swappable "active variant" pointer the NFs read at ru
+          ntime, and the PLMN it
+      21  // selects is encoded into the payload. See ue_policy_00101_tes
+          t.go for the other variant.
+      16 -const tmobileReferenceHex = "800100a600a4130062009f07d1009b0100
+         -4a0100240897a498e3fc925c9489860333" +                          
+      17 -  "d06e4e47125052494f524954495a455f4c4154454e43590021001f01001c
+         -0204010007d00412046661737408742d" +                            
+      18 -  "6d6f62696c6503636f6d0802004c0200260897a498e3fc925c9489860333
+         -d06e4e47145052494f524954495a455f4" +                           
+      19 -  "2414e4457494454480021001f01001c020401000bb804120466617374087
+         -42d6d6f62696c6503636f6d0802"                                   
+      22 +const tmobileReferenceHex = "800100f100ef13006200ea0bb900e60100
+         +4a0100240897a498e3fc925c9489860333d06e4e47125052494f524954" +  
+      23 +  "495a455f4c4154454e43590021001f01001c0204010007d0041204666173
+         +7408742d6d6f62696c6503636f6d0803" +                            
+      24 +  "004c0200260897a498e3fc925c9489860333d06e4e47145052494f524954
+         +495a455f42414e445749445448002100" +                            
+      25 +  "1f01001c020401000bb80412046661737408742d6d6f62696c6503636f6d
+         +080300490300230897a498e3fc925c94" +                            
+      26 +  "89860333d06e4e47115052494f524954495a455f47414d494e470021001f
+         +01001c020401000bb904120466617374" +                            
+      27 +  "08742d6d6f62696c6503636f6d0803"                             
+      28  
+      29  func TestBuildManageUEPolicyCommand_TMobile(t *testing.T) {
+      30    want, err := hex.DecodeString(tmobileReferenceHex)
+● Bash(python3 - <<'PY'
+      import re…)
+  ⎿  245 "800100f100ef00f11000ea0bb900e601004a0100240897a498e3fc925c9489860
+     333" +
+        "d06e4e47125052494f524954495a455f4c4154454e43590021001f01001c020401000
+     … +15 lines (ctrl+o to expand)
+
+
+● I will replace the PCF tmobileReferenceHex lines with the re-chunked version.
+  The bytes are the same; only the line breaks move.
+
+● Update(NFs/pcf/internal/policy/ue_policy_tmobile_test.go)
+  ⎿  Added 6 lines, removed 6 lines
+      19  // Load the _tmo variant by name, NOT the pcfcfg_ue_policy_wnc.
+          yaml symlink: that symlink
+      20  // is the swappable "active variant" pointer the NFs read at ru
+          ntime, and the PLMN it
+      21  // selects is encoded into the payload. See ue_policy_00101_tes
+          t.go for the other variant.
+      22 -const tmobileReferenceHex = "800100f100ef13006200ea0bb900e60100
+         -4a0100240897a498e3fc925c9489860333d06e4e47125052494f524954" +  
+      23 -  "495a455f4c4154454e43590021001f01001c0204010007d0041204666173
+         -7408742d6d6f62696c6503636f6d0803" +                            
+      24 -  "004c0200260897a498e3fc925c9489860333d06e4e47145052494f524954
+         -495a455f42414e445749445448002100" +                            
+      25 -  "1f01001c020401000bb80412046661737408742d6d6f62696c6503636f6d
+         -080300490300230897a498e3fc925c94" +                            
+      26 -  "89860333d06e4e47115052494f524954495a455f47414d494e470021001f
+         -01001c020401000bb904120466617374" +                            
+      27 -  "08742d6d6f62696c6503636f6d0803"                             
+      22 +const tmobileReferenceHex = "800100f100ef13006200ea0bb900e60100
+         +4a0100240897a498e3fc925c9489860333" +                          
+      23 +  "d06e4e47125052494f524954495a455f4c4154454e43590021001f01001c
+         +0204010007d00412046661737408742d" +                            
+      24 +  "6d6f62696c6503636f6d0803004c0200260897a498e3fc925c9489860333
+         +d06e4e47145052494f524954495a455f" +                            
+      25 +  "42414e4457494454480021001f01001c020401000bb80412046661737408
+         +742d6d6f62696c6503636f6d08030049" +                            
+      26 +  "0300230897a498e3fc925c9489860333d06e4e47115052494f524954495a
+         +455f47414d494e470021001f01001c02" +                            
+      27 +  "0401000bb90412046661737408742d6d6f62696c6503636f6d0803"     
+      28  
+      29  func TestBuildManageUEPolicyCommand_TMobile(t *testing.T) {
+      30    want, err := hex.DecodeString(tmobileReferenceHex)
+
+● Update(NFs/pcf/internal/policy/ue_policy_00101_test.go)
+  ⎿  Added 14 lines, removed 11 lines
+       8  // Reference "Manage UE Policy Command" payload for the PLMN 00
+          101 test network
+       9  // (config/pcfcfg_ue_policy_00101.yaml, used by the IMSI 001010
+          000010548 SIM).
+      10  //
+      11 -// NOTE: this is NOT byte-identical to tmobileReferenceHex, and
+         - deliberately so:                                              
+      12 -//   - offset 6..8, the encoded PLMN:  310/260 -> 13 00 62, 001
+         -/01 -> 00 f1 10                                                
+      13 -//     (2-digit MNC, so the mnc3 nibble is the 0xF filler; see 
+         -encodePLMN:                                                    
+      14 -//     plmn[0]=(mcc2<<4)|mcc1, plmn[1]=(mnc3<<4)|mcc3, plmn[2]=
+         -(mnc2<<4)|mnc1)                                                
+      15 -//   - each route selection descriptor ends 08 03 (PDUSessionTy
+         -pe IPv4v6) rather than                                         
+      16 -//     the capture's 08 02 (IPv6-only). That is the commit 66c5
+         -eb8 workaround: an                                             
+      17 -//     IPv6-only session has no usable address until SLAAC comp
+         -letes, and without a                                           
+      18 -//     timely RA the UE released the PDU session ~12s in with 5
+         -GSM cause #36.                                                 
+      19 -const plmn00101ReferenceHex = "800100a600a400f110009f07d1009b01
+         -004a0100240897a498e3fc925c9489860333" +                        
+      11 +// NOTE: this differs from tmobileReferenceHex only at offset 6
+         +..8, the encoded PLMN:                                         
+      12 +//   310/260 -> 13 00 62, 001/01 -> 00 f1 10                   
+      13 +//   (2-digit MNC, so the mnc3 nibble is the 0xF filler; see en
+         +codePLMN:                                                      
+      14 +//   plmn[0]=(mcc2<<4)|mcc1, plmn[1]=(mnc3<<4)|mcc3, plmn[2]=(m
+         +nc2<<4)|mnc1)                                                  
+      15 +//                                                             
+      16 +// Both payloads end each route selection descriptor with 08 03
+         + (PDUSessionType IPv4v6)                                       
+      17 +// instead of the QXDM capture's 08 02 (IPv6-only). That is the
+         + commit 66c5eb8 workaround:                                    
+      18 +// an IPv6-only session has no usable address until SLAAC compl
+         +etes, and without a timely                                     
+      19 +// RA the UE released the PDU session ~12s in with 5GSM cause #
+         +36.                                                            
+      20 +const plmn00101ReferenceHex = "800100f100ef00f11000ea0bb900e601
+         +004a0100240897a498e3fc925c9489860333" +                        
+      21    "d06e4e47125052494f524954495a455f4c4154454e43590021001f01001c
+          0204010007d00412046661737408742d" +
+      21 -  "6d6f62696c6503636f6d0803004c0200260897a498e3fc925c9489860333
+         -d06e4e47145052494f524954495a455f4" +                           
+      22 -  "2414e4457494454480021001f01001c020401000bb804120466617374087
+         -42d6d6f62696c6503636f6d0803"                                   
+      22 +  "6d6f62696c6503636f6d0803004c0200260897a498e3fc925c9489860333
+         +d06e4e47145052494f524954495a455f" +                            
+      23 +  "42414e4457494454480021001f01001c020401000bb80412046661737408
+         +742d6d6f62696c6503636f6d08030049" +                            
+      24 +  "0300230897a498e3fc925c9489860333d06e4e47115052494f524954495a
+         +455f47414d494e470021001f01001c02" +                            
+      25 +  "0401000bb90412046661737408742d6d6f62696c6503636f6d0803"     
+      26  
+      27  func TestBuildManageUEPolicyCommand_00101(t *testing.T) {
+      28    want, err := hex.DecodeString(plmn00101ReferenceHex)
+
+● Bash(cp /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/NFs
+      /pcf/internal/policy/ue_policy_00101_test.go
+      /home/loren/Downloads/source_code/free5gc_…)
+  ⎿  Done
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(NFs/amf/internal/policy/ue_policy_tmobile_test.go)
+  ⎿  Added 14 lines, removed 7 lines
+       5    "testing"
+       6  )
+       7  
+       8 -// Reference "Manage UE Policy Command" payload (PTI onward, 17
+         -0 bytes) captured from a                                       
+       9 -// real T-Mobile US network via QXDM. Source:                  
+       8 +// Reference "Manage UE Policy Command" payload (PTI onward, 24
+         +5 bytes) that                                                  
+       9 +// BuildManageUEPolicyCommand must produce from config/pcfcfg_u
+         +e_policy_tmo.yaml.                                             
+      10 +//                                                             
+      11 +// The payload started as a 170-byte capture from a real T-Mobi
+         +le US network via QXDM. Source:                                
+      12  //   .../test33-.../qxdm-Manage-UE-Policy-Command-Message-raw-d
+          ata.log
+      11 -// This is the exact byte string BuildManageUEPolicyCommand mus
+         -t produce from                                                 
+      12 -// config/pcfcfg_ue_policy_tmo.yaml.                           
+      13 +// The YAML file has since been changed in three ways, and thes
+         +e bytes follow the YAML file:                                  
+      14 +//   - UPSC 3001 (0b b9) instead of the capture's 2001 (07 d1).
+      15 +//   - Rule 3 added: PRIORITIZE_GAMING -> S-NSSAI 1-000bb9.    
+      16 +//   - Each route selection descriptor ends 08 03 (PDUSessionTy
+         +pe IPv4v6) instead of the                                      
+      17 +//     capture's 08 02 (IPv6-only). See the commit 66c5eb8 note
+         + in ue_policy_00101_test.go.                                   
+      18  //
+      19  // Load the _tmo variant by name, NOT the pcfcfg_ue_policy_wnc.
+          yaml symlink: that symlink
+      20  // is the swappable "active variant" pointer the NFs read at ru
+          ntime, and the PLMN it
+      21  // selects is encoded into the payload. See ue_policy_00101_tes
+          t.go for the other variant.
+      17 -const tmobileReferenceHex = "800100a600a4130062009f07d1009b0100
+         -4a0100240897a498e3fc925c9489860333" +                          
+      22 +const tmobileReferenceHex = "800100f100ef13006200ea0bb900e60100
+         +4a0100240897a498e3fc925c9489860333" +                          
+      23    "d06e4e47125052494f524954495a455f4c4154454e43590021001f01001c
+          0204010007d00412046661737408742d" +
+      19 -  "6d6f62696c6503636f6d0802004c0200260897a498e3fc925c9489860333
+         -d06e4e47145052494f524954495a455f4" +                           
+      20 -  "2414e4457494454480021001f01001c020401000bb804120466617374087
+         -42d6d6f62696c6503636f6d0802"                                   
+      24 +  "6d6f62696c6503636f6d0803004c0200260897a498e3fc925c9489860333
+         +d06e4e47145052494f524954495a455f" +                            
+      25 +  "42414e4457494454480021001f01001c020401000bb80412046661737408
+         +742d6d6f62696c6503636f6d08030049" +                            
+      26 +  "0300230897a498e3fc925c9489860333d06e4e47115052494f524954495a
+         +455f47414d494e470021001f01001c02" +                            
+      27 +  "0401000bb90412046661737408742d6d6f62696c6503636f6d0803"     
+      28  
+      29  func TestBuildManageUEPolicyCommand_TMobile(t *testing.T) {
+      30    want, err := hex.DecodeString(tmobileReferenceHex)
+
+● Now I will run every policy test in the AMF and the PCF. I will also check
+  line lengths in the four edited test files against the 120-character limit,
+  and grep the new comments for we/us/our.
+
+● Bash(for nf in amf pcf; do echo "== $nf"; (cd $nf && go test
+      ./internal/policy/ -v 2>&1 | grep -E "^--- |^ok|^FAIL"); done; awk
+      'length($0)>120{print FILENAME": "FNR…)
+  ⎿  == amf
+     --- PASS: TestBuildManageUEPolicyCommand_00101 (0.00s)
+     --- PASS: TestPLMN00101IsPurePLMNSwapOfTMobile (0.00s)
+     … +11 lines (ctrl+o to expand)
+
+● I updated the stale expected bytes, and all 4 policy tests now pass in both
+  the AMF and the PCF, including the new delete test. No line in the edited test
+  files is longer than the 120-character limit.
+
+  What changed in the four test files:
+
+  ┌───────────────────────────┬──────────────────────────────────────────────┐
+  │ File (AMF and PCF copies) │                    Change                    │
+  ├───────────────────────────┼──────────────────────────────────────────────┤
+  │                           │ tmobileReferenceHex now holds the 245 bytes  │
+  │ ue_policy_tmobile_test.go │ built from the current                       │
+  │                           │ pcfcfg_ue_policy_tmo.yaml. The old value was │
+  │                           │  the 170-byte QXDM capture.                  │
+  ├───────────────────────────┼──────────────────────────────────────────────┤
+  │                           │ plmn00101ReferenceHex holds the same 245     │
+  │ ue_policy_00101_test.go   │ bytes, except the PLMN bytes are 00 f1 10    │
+  │                           │ (001/01) instead of 13 00 62 (310/260).      │
+  └───────────────────────────┴──────────────────────────────────────────────┘
+
+  Where the new bytes came from: I took them from the encoder's current output,
+  so on their own they would only prove that the encoder gives the same result
+  as today. To check that they match the YAML file, I decoded the main fields:
+  UPSC 3001 (0b b9), the three rules with SDs 0007d0, 000bb8 and 000bb9, and 08 
+  03 (PDU session type IPv4v6) at the end of each rule.
+
+  Comments: I also changed the comments, because the old ones were now wrong.
+  - The T-Mobile test said the bytes were "the exact capture". It now says the
+    bytes started as the QXDM capture and lists the three ways the YAML differs
+    from it: UPSC 3001 instead of 2001, the added PRIORITIZE_GAMING rule, and 08
+    03 instead of 08 02. The AMF copy still gives the path to the capture log.
+  - The 00101 test said its bytes differ from the T-Mobile bytes in the PLMN and
+    in 08 03 versus 08 02. Now they differ only in the PLMN, so the comment
+    says that. The note about commit 66c5eb8, which explains why IPv4v6 replaced
+    IPv6-only, is still there.
+
+  What the tests guard now: they check the YAML files as they are on disk, not
+  the original QXDM capture. If someone edits pcfcfg_ue_policy_tmo.yaml again,
+  the expected bytes must be updated in all four files.
+  TestPLMN00101IsPurePLMNSwapOfTMobile still fails if only one of the two YAML
+  files is edited.
+
+  Nothing is committed.
+
+✻ Sautéed for 1m 43s · done Thursday 6:43 PM
+
+※ recap: You are making `pcfcfg_ue_policy_tmo_del.yaml` delete the UE's stored T-Mobile URSP; the AMF and PCF encoder fix is done and all policy tests pass. Next, rebuild with `make amf pcf` and test the delete on the UE. (disable recaps in /config)
+
+❯ After deploy to CN, I didn't see CN send "Manage UE Policy Command" after     
+  default PDN session accept, normally, it should send after PDN  accept.       
+                                                                                
+  Log: /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_lo 
+  gs/test6-not-sending-manage-ue-command-now/free5gc/log/console_free5gc.log    
+
+● I will load the systematic-debugging skill, since this is an unexpected
+  behavior to investigate.
+
+● Skill(superpowers:systematic-debugging)
+  ⎿  Successfully loaded skill
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_
+      logs/test6-not-sending-manage-ue-command-now && find . -type f | head -50;
+      wc -l free5g…)
+  ⎿  ./free5gc/config/chfcfg.yaml
+     ./free5gc/config/n3iwfcfg.test.yaml
+     ./free5gc/config/pcfcfg_ue_policy_00101.yaml
+     … +64 lines (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc &&
+      grep -rn -i "enableUEPolicy" --include=*.go NFs/amf | grep -v _test; echo
+      "--- deployed…)
+  ⎿  NFs/amf/internal/sbi/processor/callback.go:395:            logger.ProducerLog.Inf
+     o
+     f("WNC: UE Policy delivery disabled by config (enableUEPolicy=false),
+     skipping for UE %s", ue.Supi)
+     … +23 lines (ctrl+o to expand)
+
+● Bash(cd /home/loren/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc/my_
+      logs/test6-not-sending-manage-ue-command-now/free5gc/config && ls -l
+      pcfcfg_ue_policy_w…)
+  ⎿  Error: Exit code 1
+     -rw-rw-r-- 2 loren loren 3613 2026-10-08 18:46 pcfcfg_ue_policy_wnc.yaml
+     deployed pcfcfg_ue_policy_wnc.yaml is identical to 
+     pcfcfg_ue_policy_tmo_del.yaml
+
+● The CN did not send the command because enableUEPolicy: false is set in the 
+  deployed AMF config
+
+  My encoder change is not the cause. The AMF stopped before the policy file was
+  ever read.
+
+  What the log shows: At both registrations, 18:50:02 (log line 2174) and
+  18:54:13 (line 4012), the AMF logged:
+
+  WNC: UE Policy delivery disabled by config (enableUEPolicy=false), skipping 
+  UEPolicyControlCreate
+
+  Why that stops the command: The deployed amfcfg.yaml has enableUEPolicy: false
+  at line 339. Your local config/amfcfg.yaml has enableUEPolicy: true on the
+  same line, so the file on the CN differs from the one in the repository. When
+  the flag is false, the AMF skips the whole UE policy flow at
+  NFs/amf/internal/gmm/handler.go:821:
+
+  1. The AMF does not call UEPolicyControlCreate, so it never asks the PCF to
+     create a UE policy association.
+  2. With no association, the PCF never loads pcfcfg_ue_policy_wnc.yaml and
+     never builds the MANAGE UE POLICY COMMAND.
+  3. The 16 "Handle N1N2 Message Transfer Request" lines in the log are the
+     SMF's PDU session messages. None of them is a UE policy message.
+
+  The same flag also blocks the PCF-notification path at
+  NFs/amf/internal/sbi/processor/callback.go:395.
+
+  What to change on the CN: In the free5gc directory on the CN, set the flag
+  back to true and restart the core:
+
+  sed -i 's/^  enableUEPolicy: false/  enableUEPolicy: true/' config/amfcfg.yaml
+  grep -n "enableUEPolicy" config/amfcfg.yaml
+
+  The grep line should print 339:  enableUEPolicy: true. The AMF reads
+  amfcfg.yaml only at startup, so restart it, then make the UE register again
+  (AT+CFUN=0, then AT+CFUN=1).
+
+  What the CN will send after that: The deployed pcfcfg_ue_policy_wnc.yaml is a
+  regular file (not a symlink), and it is byte-identical to
+  pcfcfg_ue_policy_tmo_del.yaml. So the next MANAGE UE POLICY COMMAND will be
+  the delete command for UPSC 2001 and 3001, not the T-Mobile install policy. If
+  the new AMF and PCF binaries are deployed, the air trace should show each
+  instruction as 0002 followed by the UPSC.
+
+  ★ Insight ─────────────────────────────────────
+  - enableUEPolicy is a *bool (NFs/amf/pkg/factory/config.go:120). Leaving the
+    field out means "enabled", so it turns off only when the YAML says false
+    explicitly. Something wrote false into the deployed copy on purpose,
+    probably an earlier test that turned UE policy delivery off.
+  - The PCF reads pcfcfg_ue_policy_wnc.yaml only when an association is created.
+    A gate earlier in the AMF hides every problem further down, so look for
+    that gate in the log before looking at the encoder.
+    ─────────────────────────────────────────────────
+
+✻ Baked for 44s · done Thursday 7:04 PM
+
+❯ Right, I forgot to enable it.                                                 
+
+● That happens easily. Two different places in the log could have told you this,
+  and only one of them is where you were looking. Once enableUEPolicy: true is
+  set and the AMF restarts, check these in order:
+
+  1. AMF log: look for UEPolicyControlCreate near the registration. The
+     enableUEPolicy=false line should no longer appear.
+  2. Air trace: after the default PDU session is accepted, you should see a DL
+     NAS TRANSPORT that carries the MANAGE UE POLICY COMMAND. In its section
+     management list, each instruction should be 0002 07d1 and 0002 0bb9,
+     meaning it holds only the UPSC.
+  3. UE answer: the UE should reply with MANAGE UE POLICY COMPLETE. If it sends
+     MANAGE UE POLICY COMMAND REJECT instead, the cause value says why.
+  4. Next registration: the UE STATE INDICATION should no longer list UPSC: 
+     0x0bb9.
+
+  After the delete test, the deployed pcfcfg_ue_policy_wnc.yaml is still a copy
+  of the delete file. Copy pcfcfg_ue_policy_tmo.yaml back over it, or link it
+  with ln -sfn, so the next registration installs the T-Mobile policy again
+  instead of deleting it.
+
+✻ Baked for 7s · done Thursday 7:05 PM
+
+❯ It works now.                                                                 
+
+● Good, the empty-contents delete works on the real UE.
+
+  None of this work is committed yet. Here is what is waiting:
+
+  - AMF submodule (NFs/amf): the encoder change in internal/policy/ue_policy.go,
+    the new ue_policy_tmo_del_test.go, and the updated expected bytes in
+    ue_policy_tmobile_test.go and ue_policy_00101_test.go.
+  - PCF submodule (NFs/pcf): the same four changes.
+  - Main repository: the new config/pcfcfg_ue_policy_tmo_del.yaml.
+
+  Those files share their folders with other uncommitted changes that were there
+  before this session, such as internal/gmm/handler.go and
+  pkg/factory/config.go in the AMF. A commit should stage only the files listed
+  above. If you want, I can commit them; tell me whether the two submodule
+  commits should also go into one bump commit in the main repository.
+
+✻ Baked for 7s · done 5:28 PM

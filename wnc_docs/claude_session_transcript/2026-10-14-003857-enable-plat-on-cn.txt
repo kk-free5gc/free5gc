@@ -1,0 +1,1673 @@
+ ▐▛███▛█   Claude Code v2.1.289
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   ~/Downloads/source_code/free5gc_use_open5gs_ipv6/free5gc
+
+
+❯   Option 2: add a PLAT to the lab, for a full test                            
+                                                                                
+    A full test needs a NAT64 gateway on the core side. The core can already    
+  reach the public network over IPv4, so a Linux                                
+    host with both of these connections can act as the PLAT:                    
+                                                                                
+  - IPv6 toward the UE side of the core, like the network of 2001:db8:126::1.   
+  - IPv4 toward the public network.                                             
+                                                                                
+    The lab owner must do three things:                                         
+                                                                                
+  1. Run NAT64 on that host. Jool is a common open-source NAT64 for Linux. On   
+  the host, modprobe jool and jool instance                                     
+     add --netfilter --pool6 64:ff9b::/96 start a stateful NAT64 for the        
+  well-known prefix. Jool then uses the host's own                              
+     IPv4 address as the shared public address.                                 
+  2. Route 64:ff9b::/96 to that host. The UPF (User Plane Function, the core    
+  node that forwards UE traffic) must send UE                                   
+     traffic for 64:ff9b::/96 to the NAT64 host.                                
+  3. Optional: run DNS64 and give its address to the UE. For example, unbound   
+  with module-config: "dns64 iterator" and                                      
+     dns64-prefix: 64:ff9b::/96. The core must then hand out that DNS server    
+  instead of 2001:4860:4860::8888. That server                                  
+     cannot be reached from the lab anyway, because the lab has no IPv6 route   
+  to the Internet.                                                              
+                                                                                
+    Step 3 is needed only to test prefix discovery, which is how a public       
+  network works. Without Step 3, the ip6prefix from                             
+    Option 1 is enough for traffic. DNS also works then, because 464-clatd      
+  carries IPv4 DNS queries to 8.8.8.8 through the                               
+    NAT64.                                                                      
+                                                                                
+    I do not know which core software the lab ORAN runs. Ask the lab owner what 
+  runs at 2001:db8:126::1, and whether the UPF                                  
+    can route 64:ff9b::/96 to a separate host.                                  
+                                                                                
+  To test my UE's CLAT function, I want to add PLAT support on my remote CN,    
+  how to do it?                                                                 
+
+● I'll read the free5gc core configs to see how the UPF and SMF are set up. That
+  tells me where NAT64 traffic will leave the core and which DNS server the UE
+  receives.
+
+  Listed 1 directory (ctrl+o to expand)
+
+● Next I'll read the UPF IPv6 pool details and the SMF DNS settings, which
+  decide what the UE gets as its DNS server.
+
+● Bash(sed -n 1,60p config/upfcfg.yaml && grep -nE -A4 "dns:" config/smfcfg.yaml
+      | head -40 && grep -rnE "ipv6|forwarding|ip6tables|MASQUERADE|NAT" run.sh
+      | head -20)
+  ⎿  version: 1.0.3
+     description: UPF initial local configuration
+     … +97 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● The lab differs from the pasted Option 2 in one useful way, so the setup is
+  simpler than that text describes.
+
+  ★ Insight ─────────────────────────────────────
+  - In this lab the UPF is not a separate box. config/upfcfg.yaml shows that the
+    UPF runs on the cn host itself, with N3 address 5.5.5.2 and the gtp5g
+    kernel module as the forwarder. The gtp5g module removes the GTP-U header
+    from each uplink packet and hands the inner IPv6 packet to the cn kernel on
+    the upfgtp interface. NAT64 (the IPv6-to-IPv4 translator, called the PLAT on
+    the core side) can therefore run on cn itself. Step 2 of the pasted text
+    ("route 64:ff9b::/96 to a separate host") is then not needed.
+  - Jool in --netfilter mode hooks the kernel's netfilter PREROUTING stage. It
+    catches any IPv6 packet addressed to 64:ff9b::/96, including packets that
+    arrive from upfgtp, before the kernel makes a routing decision. Jool also
+    catches the IPv4 replies that come back to the cn IPv4 address and turns
+    them back into IPv6. The kernel then routes those IPv6 replies to the UE
+    prefix through upfgtp, which is the downlink route that already works for
+    slice 122.
+  - The free5gc UPF Router Advertisement (RA) code has no PREF64 option. PREF64
+    (RFC 8781) is an RA option that tells the UE the NAT64 prefix directly.
+    Without PREF64, the UE learns the prefix in one of two ways: you set it by
+    hand (the ip6prefix option on the UE side), or the UE runs DNS64 discovery.
+    In DNS64 discovery the UE asks DNS for the AAAA record of ipv4only.arpa
+    (RFC 7050).
+    ─────────────────────────────────────────────────
+
+  Plan for the cn host
+
+  None of these commands has been run on cn yet. Run them in this order.
+
+  Step 1: Install Jool and start the NAT64 (the PLAT)
+
+  This step installs the Jool kernel module and its command-line tools, and
+  turns on forwarding. It then starts one stateful NAT64 instance for the
+  well-known prefix 64:ff9b::/96.
+  sudo apt install -y jool-dkms jool-tools
+  sudo sysctl -w net.ipv4.ip_forward=1
+  sudo sysctl -w net.ipv6.conf.all.forwarding=1
+  sudo modprobe jool
+  sudo jool instance add "plat" --netfilter --pool6 64:ff9b::/96
+  sudo jool -i plat instance display
+  - jool-dkms compiles the Jool kernel module against the running kernel. The cn
+    kernel changed after the recent reboot, so check that dkms status shows
+    jool as installed for uname -r.
+  - Pool4 is the set of IPv4 addresses and ports that Jool uses as the shared
+    public source. When pool4 is empty, Jool uses the cn host's own IPv4 address
+    on the egress interface, with ports 61001–65535. That works if cn already
+    reaches the Internet over IPv4.
+  - The commands above do not survive a reboot. To keep IPv6 forwarding after a
+    reboot, use the same method as the persistent UPF IPv6 forwarding fix from
+    the slice-122 IPv6 work.
+
+  Step 2: Test the PLAT alone, before the UE CLAT is involved
+
+  From the UE, on an IPv6 PDU session (slice 122 is the one already known to
+  work), ping an IPv4 host through its NAT64 address:
+  ping6 64:ff9b::808:808
+  64:ff9b::808:808 is 8.8.8.8 written inside the NAT64 prefix. On cn, sudo jool 
+  -i plat session display --icmp should then list the translation session. If
+  the ping works, the PLAT works, and any later failure is on the UE CLAT side.
+  (CLAT is the UE-side translator that turns IPv4 traffic into IPv6.)
+
+  Step 3: Test the UE CLAT with a fixed prefix (no core changes)
+
+  Use an IPv6-only PDU session. Remember that an IPv6-only session needs the
+  IPv4 N3 F-TEID 5.5.5.2, as recorded in the N3 memory. Set the UE CLAT prefix
+  by hand to 64:ff9b::/96 (the ip6prefix option). Then ping 8.8.8.8 from the UE,
+  or from the LAN client behind it. DNS also works in this mode, because the
+  CLAT carries IPv4 DNS queries to 8.8.8.8 through the NAT64.
+
+  Step 4 (optional): DNS64 on cn, to test automatic prefix discovery
+
+  4a. This command gives the DNS64 server an IPv6 address that the UE can reach.
+  It puts a new address on the cn loopback interface. The address
+  2001:db8:ffff::53 is only an example; pick any address outside the UE pools.
+  sudo ip -6 addr add 2001:db8:ffff::53/128 dev lo
+
+  4b. This step installs unbound and writes its DNS64 configuration, one echo
+  line per line of the file. unbound forwards queries over IPv4 to 8.8.8.8,
+  because cn has no IPv6 route to the Internet. The ip-freebind line lets
+  unbound start even if the loopback address is missing.
+  sudo apt install -y unbound
+  echo 'server:' | sudo tee /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  interface: 2001:db8:ffff::53' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  ip-freebind: yes' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  access-control: 2001:db8::/32 allow' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  module-config: "dns64 iterator"' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  dns64-prefix: 64:ff9b::/96' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo 'forward-zone:' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  name: "."' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  forward-addr: 8.8.8.8' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  sudo systemctl restart unbound
+  dig AAAA ipv4only.arpa @2001:db8:ffff::53
+  The dig result should include 64:ff9b::c000:aa (the NAT64 form of
+  192.0.0.170). unbound listens only on that one address, so it does not clash
+  with systemd-resolved on 127.0.0.53.
+
+  4c. This is the free5gc change. In config/smfcfg.yaml, change dns.ipv6 for the
+  DNN under test from 2001:4860:4860::8888 to 2001:db8:ffff::53, then restart
+  the SMF. After that, remove the manual ip6prefix from the UE so that the UE
+  discovers the prefix itself.
+
+  Caveats
+
+  - RFC 6052 does not allow the well-known prefix 64:ff9b::/96 to reach private
+    IPv4 addresses, and Jool follows that rule. Test against public IPv4 targets
+    such as 8.8.8.8, not lab 10.x or 192.168.x hosts.
+  - The current uplink rule (permit out ip from assigned to any) already allows
+    any destination. No change to the SMF or UPF packet rules is needed for
+    64:ff9b::/96.
+
+  Do you want me to run Steps 1 and 2 on cn through the tmux session now? I
+  would first check uname -r and dkms status there, because the kernel changed
+  after the reboot.
+
+✻ Cogitated for 1m 17s · done Tuesday 5:28 PM
+
+❯ Here is more info I received:                                                 
+    ▎ Request: NAT64 for 464XLAT (CLAT) testing on the lab ORAN                 
+    ▎                                                                           
+    ▎ The WNC T930 CPE needs to test 464XLAT on the lab ORAN before field       
+  testing. In 464XLAT, the CPE translates IPv4                                  
+    ▎ packets into IPv6 packets (CLAT). A NAT64 gateway in the operator network 
+  translates them back into IPv4 (PLAT). The                                    
+    ▎ lab ORAN reaches the public network over IPv4 only and has no NAT64, so   
+  the translated packets from the CPE have                                      
+    ▎ nowhere to go.                                                            
+    ▎                                                                           
+    ▎ Requested setup:                                                          
+    ▎                                                                           
+    ▎ 1. NAT64 gateway. A Linux host with IPv6 toward the UE side of the core,  
+  and IPv4 toward the public network, runs a                                    
+    ▎ stateful NAT64 for the well-known prefix 64:ff9b::/96. One example is     
+  Jool: modprobe jool, then jool instance add                                   
+    ▎ --netfilter --pool6 64:ff9b::/96. Jool then uses the host's IPv4 address  
+  as the shared public address.                                                 
+    ▎ 2. Routing. The UPF routes UE traffic for 64:ff9b::/96 to the NAT64 host. 
+    ▎ 3. DNS64 (optional, needed for the full test). A DNS64 server, for        
+  example unbound with module-config: "dns64                                    
+    ▎ iterator" and dns64-prefix: 64:ff9b::/96. The core gives its IPv6 address 
+  to the UE as the DNS server, in place of                                      
+    ▎ 2001:4860:4860::8888. The CPE uses DNS64 to discover the NAT64 prefix, as 
+  it would on a public network.                                                 
+    ▎                                                                           
+    ▎ Test PDN: APN fast.t-mobile.com, PDN type IPv6 only. The UE receives a    
+  2001:db8:121:1::/64 prefix and can reach                                      
+    ▎ 2001:db8:126::1 today.                                                    
+    ▎                                                                           
+    ▎ Check after setup: from the UE, ping6 64:ff9b::808:808 should get replies 
+  from 8.8.8.8 through the NAT64.                                               
+    ▎                                                                           
+    ▎ Questions: which core software runs the UPF, and can the UPF route        
+  64:ff9b::/96 to a separate host?                                              
+
+● The request names a specific test PDN and address, so I'll search the configs
+  for the 121 pool and for 2001:db8:126::1 to see which core settings they map
+  to.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● The request maps onto the existing configs as follows. It also shows one more
+  place where the DNS server must change.
+
+  ★ Insight ─────────────────────────────────────
+  - The test PDN (APN fast.t-mobile.com, prefix 2001:db8:121:1::/64) uses the
+    second dnnList entry in config/upfcfg.yaml (line 42). That entry has pool
+    2001:db8:121::/48 and slice SST 1, SD 000001.
+  - The UE receives its IPv6 DNS server through two separate paths. One path is
+    the SMF dns.ipv6 value, which goes to the UE in the NAS PDU Session
+    Establishment Accept. The other path is the RDNSS option (the RA option that
+    lists DNS servers) in the UPF Router Advertisement. The RDNSS list is set
+    under routerAdvertisements.default.dns in config/upfcfg.yaml (lines
+    381–383), and it is 2001:4860:4860::8888 / ::8844 today. For the DNS64 test,
+    both paths must point to the DNS64 server. If only one is changed, a CPE
+    that reads the RA might keep using Google DNS, which is unreachable, and
+    prefix discovery would fail.
+  - Every DNN uses the default RA profile. To avoid changing DNS for all slices,
+    add a second RA profile (for example dns64) whose dns list holds the DNS64
+    address. Then set raProfile: dns64 only on the 2001:db8:121::/48 entry.
+    ─────────────────────────────────────────────────
+
+  Answers to the two questions in the request
+
+  1. Which core software runs the UPF?
+  The UPF is free5gc's UPF (Go), built from this repository's my-changes-v4.0.1
+  branch. The UPF uses the gtp5g kernel module and runs on the cn host. The
+  N3/N4 address is 5.5.5.2. The UE IPv6 prefixes and RAs come from this UPF.
+
+  2. Can the UPF route 64:ff9b::/96 to a separate host?
+  Yes. gtp5g hands decapsulated UE packets to the cn Linux kernel through the
+  upfgtp interface, so normal kernel routing on cn applies:
+  sudo ip -6 route add 64:ff9b::/96 via <NAT64-host-IPv6>
+  The NAT64 host also needs a return route that sends 2001:db8:121::/48 back to
+  cn.
+
+  A separate host is not required, though. cn already has IPv6 toward the UE
+  (through upfgtp) and IPv4 to the public network. That makes cn itself a
+  suitable NAT64 host, and Step 2 of the request is then not needed. Jool's
+  --netfilter hook catches 64:ff9b::/96 traffic as it arrives from upfgtp.
+
+  Changes to the earlier plan
+
+  - Steps 1–3 (Jool on cn, then ping6 64:ff9b::808:808) stay the same. Run the
+    ping on the fast.t-mobile.com IPv6-only session.
+  - Step 4 (DNS64) now changes three settings, not one:
+    a. unbound on cn listens on an IPv6 address that the UE can reach. If
+       2001:db8:126::1 is an address on cn, unbound can listen on it. It is not
+       in any free5gc config file, and the UE already reaches it, so it is the
+       natural choice.
+    b. config/smfcfg.yaml: set dns.ipv6 for fast.t-mobile.com on SST 1 / SD
+       000001 to that address.
+    c. config/upfcfg.yaml: add an RA profile dns64 whose dns list holds that
+       address, and set raProfile: dns64 on the 2001:db8:121::/48 entry. Then
+       restart the UPF and the SMF.
+
+  I have not checked what 2001:db8:126::1 is. Do you want me to open a tmux
+  session to cn and run ip -6 addr | grep 126 plus uname -r and dkms status?
+  That would confirm the DNS64 address and check whether Jool can build for the
+  new kernel.
+
+✻ Crunched for 30s · done Tuesday 5:30 PM
+
+❯ 2001:db8:126::1 is an IP on core network interface. I use it to test ipv6     
+  ping so far.                                                                  
+  upfgtp: flags=4305<UP,POINTOPOINT,RUNNING,NOARP,MULTICAST>  mtu 1464          
+          inet6 2001:db8:151::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:163::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:122::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:126::1  prefixlen 48  scopeid 0x0<global>              
+
+● The pasted output shows that 2001:db8:126::1 sits on upfgtp itself. I'll check
+  whether the free5gc UPF adds these upfgtp addresses at startup or whether
+  they were added by hand. That decides whether the address survives a UPF
+  restart, and the DNS64 server would depend on it.
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Bash(sed -n 278,292p config/upfcfg.yaml)
+  ⎿      cidr: 10.116.0.0/16 # Classless Inter-Domain Routing for assigned
+     IPv4 pool of UE
+         snssai:              # OPTIONAL - only for logging, not routing lo
+     … +16 lines (ctrl+o to expand)
+
+● Yes, 2001:db8:126::1 works as the DNS64 address. One detail about that address
+  affects the setup.
+
+  ★ Insight ─────────────────────────────────────
+  - The free5gc UPF creates that address itself. At startup,
+    NFs/upf/internal/forwarder/driver.go:126-139 takes every dnnList entry that
+    has an ipv6.prefix. For each one it adds a route for the pool and puts the
+    pool's first address (::1) on upfgtp. 2001:db8:126::1 is the gateway address
+    for the vzwadmin pool 2001:db8:0126::/48 (config/upfcfg.yaml:283-285). The
+    SMF also reserves it (config/smfcfg.yaml:509) so that it is never given to a
+    UE.
+  - The UE on fast.t-mobile.com (prefix 2001:db8:121:1::/64) can still reach
+    2001:db8:126::1. The Linux kernel accepts a packet for any local address,
+    whichever interface or pool that address belongs to.
+  - The address exists only while the UPF runs. When the UPF stops, the upfgtp
+    interface and all its addresses are deleted. When the UPF starts, the UPF
+    creates them again. A DNS server bound to 2001:db8:126::1 must therefore be
+    able to start while the address is missing.
+    ─────────────────────────────────────────────────
+
+  DNS64 settings, using 2001:db8:126::1
+
+  unbound on cn. The configuration lines are the same as in the earlier Step 4b,
+  with these differences:
+  echo 'server:' | sudo tee /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  interface: 2001:db8:126::1' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  ip-freebind: yes' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  access-control: 2001:db8::/32 allow' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  module-config: "dns64 iterator"' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  dns64-prefix: 64:ff9b::/96' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo 'forward-zone:' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  name: "."' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  forward-addr: 8.8.8.8' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  - ip-freebind: yes lets unbound bind to 2001:db8:126::1 even when the UPF is
+    down and the address does not exist.
+  - The step 4a loopback address 2001:db8:ffff::53 is no longer needed.
+  - If dig AAAA ipv4only.arpa @2001:db8:126::1 stops answering after a UPF
+    restart, run sudo systemctl restart unbound.
+
+  Core config. These changes give the UE 2001:db8:126::1 as its DNS server,
+  through both NAS and the RA:
+  1. config/smfcfg.yaml: for fast.t-mobile.com on SST 1 / SD 000001, set
+     dns.ipv6: 2001:db8:126::1.
+  2. config/upfcfg.yaml: add an RA profile dns64. Copy the default profile and
+     set dns: [2001:db8:126::1]. Then set raProfile: dns64 on the
+     2001:db8:121::/48 entry (line 42). Other slices keep the default profile.
+  3. Restart the UPF and the SMF.
+
+  Something unexpected in the pasted output
+
+  The local config/upfcfg.yaml defines many IPv6 pools, including
+  2001:db8:121::/48 for the test PDN. The UPF adds ::1 for every IPv6 pool. Yet
+  upfgtp on cn shows only four addresses, and 2001:db8:121::1 is not among them.
+  There are two possible causes:
+  - The UPF on cn runs with a different upfcfg.yaml than the local copy.
+  - The address add failed. In that case the UPF log on cn has a WNC: Failed to 
+    assign IPv6 gateway address for DNN ... warning.
+
+  Either way, the UE still reaches 2001:db8:126::1, so this does not block the
+  NAT64 test. Before editing, though, find out which upfcfg.yaml the cn host
+  really loads. My edits would otherwise go into a file that cn does not use.
+
+  Do you want me to make the smfcfg.yaml and upfcfg.yaml edits in this
+  repository? Or should I first open a tmux session to cn and check which config
+  files the UPF and SMF load there, together with uname -r and dkms status for
+  Jool?
+
+✻ Churned for 42s · done Tuesday 5:32 PM
+
+❯ Sorry, I didn't paste all of them before:                                     
+  upfgtp: flags=4305<UP,POINTOPOINT,RUNNING,NOARP,MULTICAST>  mtu 1464          
+          inet6 2001:db8:151::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:163::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:122::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:126::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:166::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:121::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:141::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:125::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:165::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 2001:db8:111::1  prefixlen 48  scopeid 0x0<global>              
+          inet6 fe80::347a:27d8:32d9:633d  prefixlen 64  scopeid 0x20<link>     
+          inet6 2001:db8:131::1  prefixlen 48  scopeid 0x0<global>              
+          unspec 00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00  txqueuelen    
+  1000  (UNSPEC)                                                                
+          RX packets 0  bytes 0 (0.0 B)                                         
+          RX errors 0  dropped 0  overruns 0  frame 0                           
+          TX packets 0  bytes 0 (0.0 B)                                         
+          TX errors 4  dropped 0 overruns 0  carrier 0  collisions 0            
+  Also, 2001:db8:126::1 is the GW of one of my slice (vzwadmin slice st:1, sd:  
+  000001), I do not use it right now, but show I use a new addr?                
+
+● Thanks. The full list includes 2001:db8:121::1, so the UPF on cn added a
+  gateway for every pool. The discrepancy I raised in my last message does not
+  exist. Ignore it.
+
+  Before answering about a new address, I'll check that a candidate prefix such
+  as 2001:db8:53:: is not used by any pool or interface in the configs.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Yes, use a new address. Put it on the loopback interface lo of cn, outside
+  every UE pool. 2001:db8:53::53 is free, because no config file uses
+  2001:db8:53::.
+
+  ★ Insight ─────────────────────────────────────
+  - 2001:db8:126::1 belongs to the vzwadmin pool. The UPF deletes it with upfgtp
+    on every UPF stop and adds it again on every start. A DNS64 server bound to
+    it therefore depends on the UPF lifecycle and on a slice that has nothing
+    to do with the test. An address on lo stays in place across UPF restarts.
+  - The UE can reach an address on lo. The uplink packet rule is permit out ip 
+    from assigned to any, so it accepts any destination. The cn kernel delivers
+    a packet for any local address, whatever interface the address is on. The
+    reply leaves with source 2001:db8:53::53, and the existing route sends
+    2001:db8:121::/48 back through upfgtp. Today the UE already reaches
+    2001:db8:126::1, which is not on the UE's own link, so the UE's default
+    route works for a lo address too.
+  - A /128 mask on lo makes 2001:db8:53::53 a single host address. It adds no
+    on-link prefix that could overlap a pool, and the N3 address
+    2001:db8::5:5:5:2 is in a different /48.
+    ─────────────────────────────────────────────────
+
+  Changes, using 2001:db8:53::53
+
+  1. On cn, add the address to lo. This command does not survive a reboot. To
+  keep it, add the address to the lo section in netplan, or to the same boot
+  script that makes UPF IPv6 forwarding persistent.
+  sudo ip -6 addr add 2001:db8:53::53/128 dev lo
+
+  2. On cn, configure unbound. The lines are the same as before, with a new
+  interface line. ip-freebind is still useful if unbound starts before the lo
+  address exists at boot.
+  echo 'server:' | sudo tee /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  interface: 2001:db8:53::53' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  ip-freebind: yes' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  access-control: 2001:db8::/32 allow' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  module-config: "dns64 iterator"' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  dns64-prefix: 64:ff9b::/96' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo 'forward-zone:' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  name: "."' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  forward-addr: 8.8.8.8' | sudo tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  sudo systemctl restart unbound
+  dig AAAA ipv4only.arpa @2001:db8:53::53
+  The answer should include 64:ff9b::c000:aa. Before you change the core config,
+  run ping6 2001:db8:53::53 from the UE. That confirms the UE can reach the
+  address.
+
+  3. Core config. This gives the test PDN the new address as its DNS server:
+  - config/smfcfg.yaml: for fast.t-mobile.com on SST 1 / SD 000001, set
+    dns.ipv6: 2001:db8:53::53.
+  - config/upfcfg.yaml: add an RA profile dns64 that is a copy of default with
+    dns: [2001:db8:53::53]. Set raProfile: dns64 on the 2001:db8:121::/48 entry.
+    Then restart the UPF and the SMF.
+
+  The Jool steps (install, jool instance add "plat" --netfilter --pool6 
+  64:ff9b::/96, then ping6 64:ff9b::808:808 from the UE) do not change.
+
+  Do you want me to make the smfcfg.yaml and upfcfg.yaml edits in this
+  repository now?
+
+✻ Baked for 28s · done Tuesday 5:37 PM
+
+※ recap: You are adding a NAT64 gateway (Jool) and a DNS64 server (unbound at 2001:db8:53::53 on lo) on the cn host, to test the UE's CLAT. Next, confirm whether I should make the matching smfcfg.yaml and upfcfg.yaml DNS edits. (disable recaps in /config)
+
+❯ Should I manually create /etc/unbound/unbound.conf.d/dns64.conf?              
+  [root@75N0-01N0SA-sled2-CN free5gc]# ls                                       
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+  ls: cannot access '/etc/unbound/unbound.conf.d/dns64.conf': No such file or   
+  directory                                                                     
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+
+● You do not need to create it by hand. The first echo line uses tee without -a,
+  and tee creates the file. Each later line uses tee -a and appends to it.
+
+  Your shell prompt changes things, though. [root@75N0-01N0SA-sled2-CN free5gc]#
+  is the default Bash prompt on Red Hat-family systems (RHEL, Rocky, Alma,
+  CentOS). Ubuntu uses root@host:~#. My earlier commands assumed Ubuntu, and two
+  parts of them would be wrong on a Red Hat-family host:
+
+  1. The unbound directory. /etc/unbound/unbound.conf.d/ is the Debian/Ubuntu
+     directory for unbound include files. On Red Hat-family systems,
+     /etc/unbound/unbound.conf usually includes /etc/unbound/conf.d/*.conf
+     instead. A file in the wrong directory is never read, and unbound would run
+     without DNS64 and report no error.
+  2. Installing packages. apt does not exist on these systems. unbound installs
+     with dnf install unbound. Jool is not packaged for RHEL, as far as I know,
+     so it would have to be built from the source tarball on jool.mx (with
+     kernel-devel for the running kernel).
+
+  ★ Insight ─────────────────────────────────────
+  - The Red Hat unbound.conf already contains a server: block with its own
+    module-config (normally "ipsecmod validator iterator"). If the DNS64 file
+    also sets module-config, the setting that unbound reads last wins. The
+    position of the include: line inside unbound.conf therefore decides whether
+    DNS64 is active. The dig AAAA ipv4only.arpa test shows directly which
+    setting won.
+  - If DNSSEC validation should stay on, the order of modules is "dns64 
+    validator iterator". The dns64 module must come before validator, because
+    the synthesized 64:ff9b:: AAAA records are not signed.
+    ─────────────────────────────────────────────────
+
+  Before you write the file, please run these read-only checks on cn and paste
+  the output:
+  cat /etc/os-release
+  rpm -q unbound kernel-devel-$(uname -r)
+  uname -r
+  grep -nE "include|module-config|^server:" /etc/unbound/unbound.conf
+  - The first line shows the distribution and version.
+  - The rpm -q line shows whether unbound and the kernel headers for the running
+    kernel are installed. Jool needs the kernel headers to build.
+  - The grep line shows which include directory unbound really reads and where
+    that include: line sits.
+
+  With that output I can give you the right file path and the right Jool build
+  steps for this host. If you prefer, I can instead open a tmux session to cn
+  and run these four checks myself.
+
+✻ Crunched for 19s · done Tuesday 6:01 PM
+
+❯ I use Ubuntu, I just change the prompt                                        
+
+● Thanks for clarifying. On Ubuntu, the earlier commands are correct as written,
+  and you do not need to create the file by hand.
+
+  - The file is missing only because the echo ... | tee lines have not run yet.
+    The first line (tee without -a) creates
+    /etc/unbound/unbound.conf.d/dns64.conf. Every later line (tee -a) appends
+    one line to it.
+  - The directory /etc/unbound/unbound.conf.d/ is created by apt install 
+    unbound. Ubuntu's /etc/unbound/unbound.conf reads every *.conf file in that
+    directory through the line include-toplevel: 
+    "/etc/unbound/unbound.conf.d/*.conf".
+
+  Run this first to check that unbound is installed and the directory exists:
+  ls /etc/unbound/unbound.conf.d/
+  If ls reports that the directory does not exist, run apt install -y unbound
+  first. You are root, so you can leave out sudo in all the commands.
+
+  ★ Insight ─────────────────────────────────────
+  - Ubuntu's unbound package already puts root-auto-trust-anchor-file.conf in
+    that directory, and that file turns on DNSSEC trust anchors. If you want
+    DNSSEC validation to keep working alongside DNS64, use module-config: "dns64
+    validator iterator". The dns64 module must come before validator, because
+    the synthesized 64:ff9b:: AAAA records carry no signatures. With "dns64 
+    iterator", as in my earlier commands, DNS64 also works, but unbound does not
+    validate.
+  - When the configuration has an interface: line, unbound listens only on the
+    listed address (2001:db8:53::53). It therefore does not clash with
+    systemd-resolved, which listens on 127.0.0.53:53.
+    ─────────────────────────────────────────────────
+
+  After the echo lines, check the file before you restart unbound.
+  unbound-checkconf checks the main configuration and every included file, and
+  it reports any syntax error:
+  unbound-checkconf
+  systemctl restart unbound
+  dig AAAA ipv4only.arpa @2001:db8:53::53
+  Remember to add 2001:db8:53::53/128 to lo first (Step 1). The dig answer
+  should contain 64:ff9b::c000:aa.
+
+✻ Cogitated for 13s · done Tuesday 6:02 PM
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]#   echo 'server:' | sudo tee              
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  interface: 2001:db8:53::53' | sudo tee -a                           
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  ip-freebind: yes' | sudo tee -a                                     
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  access-control: 2001:db8::/32 allow' | sudo tee -a                  
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  module-config: "dns64 iterator"' | sudo tee -a                      
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  dns64-prefix: 64:ff9b::/96' | sudo tee -a                           
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo 'forward-zone:' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf   
+    echo '  name: "."' | sudo tee -a /etc/unbound/unbound.conf.d/dns64.conf     
+    echo '  forward-addr: 8.8.8.8' | sudo tee -a                                
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+  server:                                                                       
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+    interface: 2001:db8:53::53                                                  
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+    ip-freebind: yes                                                            
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+    access-control: 2001:db8::/32 allow                                         
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+    module-config: "dns64 iterator"                                             
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+    dns64-prefix: 64:ff9b::/96                                                  
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+  forward-zone:                                                                 
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+    name: "."                                                                   
+  tee: /etc/unbound/unbound.conf.d/dns64.conf: No such file or directory        
+    forward-addr: 8.8.8.8                                                       
+
+● tee failed because the directory /etc/unbound/unbound.conf.d/ does not exist.
+  tee can create a file, but it cannot create the directory the file goes in. A
+  missing directory means unbound is not installed yet. The apt install unbound
+  step from Step 4b was skipped, and the ls check in my last message would have
+  shown this.
+
+  Nothing was written, so you can safely run all the lines again after the
+  install.
+
+  1. Install unbound. This creates /etc/unbound/unbound.conf.d/ and the default
+  configuration files. Ubuntu starts the unbound service right after install,
+  listening on localhost only, which does no harm.
+  apt install -y unbound
+  ls /etc/unbound/unbound.conf.d/
+  The ls output should list at least root-auto-trust-anchor-file.conf.
+
+  2. Run the same nine echo ... | tee lines again. This time they will create
+  and fill dns64.conf.
+
+  3. Check the configuration, add the lo address if you have not yet, then 
+  restart and test:
+  unbound-checkconf
+  ip -6 addr add 2001:db8:53::53/128 dev lo
+  systemctl restart unbound
+  dig AAAA ipv4only.arpa @2001:db8:53::53
+  - unbound-checkconf should print no errors in /etc/unbound/unbound.conf.
+  - If the lo address already exists, ip -6 addr add prints RTNETLINK answers: 
+    File exists. You can ignore that message.
+  - The dig answer should contain 64:ff9b::c000:aa.
+
+  ★ Insight ─────────────────────────────────────
+  - If apt install fails because port 53 is busy, it fails while it starts the
+    service. systemd-resolved uses only 127.0.0.53:53, and the default Ubuntu
+    unbound listens on 127.0.0.1, so the two normally do not conflict. A
+    conflict would mean another DNS server (for example dnsmasq or bind9) is
+    already running on cn. ss -lunp | grep :53 shows which program holds the
+    port.
+    ─────────────────────────────────────────────────
+
+✻ Worked for 10s · done Tuesday 6:03 PM
+
+❯ Show me the full steps (I havn't start yet)                                   
+
+● I'll read the parts of config/smfcfg.yaml and config/upfcfg.yaml that the
+  core-config step changes, so the steps can name the exact lines.
+● Bash(sed -n 18,40p config/smfcfg.yaml && echo ---- && sed -n 60,72p
+      config/smfcfg.yaml && echo ---- && sed -n 365,400p config/upfcfg.yaml)
+  ⎿    # the SBI services provided by this SMF, refer to TS 29.502
+       serviceNameList:
+         - nsmf-pdusession # Nsmf_PDUSession service
+     … +71 lines (ctrl+o to expand)
+
+● Bash(grep -nE -A22 "^\s*routerAdvertisement" config/smfcfg.yaml | head -60;
+      echo ----; sed -n 330,350p config/smfcfg.yaml; echo ----; grep -rnE
+      "RDNSS|Rdnss|\.Dns\b|…)
+  ⎿  993:  routerAdvertisement:
+     994-    deliveryMethod: http  # Delivery method: "http" or "pfcp"
+     995-                          # - "http": Send RA via HTTP POST to UPF
+     … +34 lines (ctrl+o to expand)
+
+● The SMF pools carry raProfile: default too. I'll find where the SMF code
+  builds the RA and where its DNS list comes from.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Neither result shows where the RA is built. I'll search for the RA builder by
+  the ICMPv6 Router Advertisement type and by the RouterAdvertisements config
+  field.
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ Show me the full steps to do PLAT on my ORAN (I havn't start anything  yet)   
+
+● Before the steps, I need to correct something I said earlier. The code I just
+  read changes Step 3 of the core config.
+
+  ★ Insight ─────────────────────────────────────
+  - Correction: I said earlier that the UE also gets its DNS server from an
+    RDNSS option in the Router Advertisement (RA), set by
+    routerAdvertisements.default.dns in upfcfg.yaml. That is wrong. The SMF
+    builds the RA in NFs/smf/internal/context/router_advertisement.go:68
+    (BuildRouterAdvertisement). That RA contains only the RA header and one
+    Prefix Information option, with no RDNSS option. The UPF loads
+    routerAdvertisements in upfcfg.yaml, but no code uses that dns list.
+  - The UE gets its IPv6 DNS server from one place only: dns.ipv6 in
+    smfcfg.yaml. The SMF puts that address in the PCO (Protocol Configuration
+    Options, the field in the NAS PDU Session Establishment Accept that carries
+    DNS addresses). See gsm_build.go:156. The SMF adds the address only when the
+    UE asks for an IPv6 DNS server in its PCO request (gsm_handler.go:114).
+  - The test therefore needs one config change in smfcfg.yaml and no change in
+    upfcfg.yaml.
+    ─────────────────────────────────────────────────
+
+  Full steps: PLAT (NAT64) and DNS64 on the cn host
+
+  Run everything on cn as root. Test PDN: APN fast.t-mobile.com, PDN type IPv6
+  only, slice SST 1 / SD 000001, UE prefix from 2001:db8:121::/48.
+
+  Step 0: Checks before you change anything
+
+  These read-only commands show the running kernel, the interface cn uses for
+  IPv4 Internet traffic, and the current forwarding settings.
+  uname -r
+  ip route get 8.8.8.8
+  sysctl net.ipv4.ip_forward net.ipv6.conf.all.forwarding
+  Note the dev and src in the ip route get output. Jool will use that src IPv4
+  address as the shared public address.
+
+  Step 1: Turn on forwarding
+
+  This lets cn forward packets between the UE side (upfgtp) and the IPv4
+  Internet side.
+  sysctl -w net.ipv4.ip_forward=1
+  sysctl -w net.ipv6.conf.all.forwarding=1
+
+  Step 2: Install Jool and start the NAT64
+
+  2a. This installs the kernel headers for the running kernel, the Jool kernel
+  module source (built by DKMS, the system that rebuilds out-of-tree modules for
+  each kernel), and the jool command.
+  apt install -y linux-headers-$(uname -r) jool-dkms jool-tools
+  dkms status | grep jool
+  dkms status should show jool as installed for the version that uname -r
+  printed. If the build failed, the Ubuntu Jool package is too old for this
+  kernel. In that case, stop here and send me the error. The newer Jool source
+  from jool.mx would be needed.
+
+  2b. This loads Jool and creates one stateful NAT64 instance named plat for the
+  prefix 64:ff9b::/96.
+  modprobe jool
+  jool instance add "plat" --netfilter --pool6 64:ff9b::/96
+  jool -i plat instance display
+  jool -i plat global display | grep -E "pool6|enabled"
+
+  Step 3: Test the PLAT from the UE
+
+  Bring up the fast.t-mobile.com IPv6-only PDU session on the UE, then run this
+  on the UE:
+  ping6 64:ff9b::808:808
+  On cn, this command lists the translation sessions:
+  jool -i plat session display --icmp --numeric
+  A session line from the UE's 2001:db8:121:... address to 8.8.8.8 shows that
+  the PLAT works. You cannot test from cn itself. Jool --netfilter translates
+  only packets that arrive from another device, not packets that cn sends
+  itself.
+
+  At this point you can also test the UE CLAT with the NAT64 prefix set by hand
+  to 64:ff9b::/96 (the ip6prefix setting on the UE). Then run ping 8.8.8.8 from
+  the UE or from the LAN client.
+
+  Step 4: DNS64 server on cn
+
+  4a. This adds a dedicated DNS64 address on the loopback interface. The address
+  is outside every UE pool and does not depend on the UPF.
+  ip -6 addr add 2001:db8:53::53/128 dev lo
+
+  4b. This installs unbound and checks that its include directory now exists.
+  apt install -y unbound
+  ls /etc/unbound/unbound.conf.d/
+
+  4c. These lines write the DNS64 configuration file, one line of the file per
+  command.
+  echo 'server:' | tee /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  interface: 2001:db8:53::53' | tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  ip-freebind: yes' | tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  access-control: 2001:db8::/32 allow' | tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  module-config: "dns64 validator iterator"' | tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  dns64-prefix: 64:ff9b::/96' | tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo 'forward-zone:' | tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  name: "."' | tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  forward-addr: 8.8.8.8' | tee -a /etc/unbound/unbound.conf.d/dns64.conf
+
+  4d. This checks the configuration, restarts unbound, and tests DNS64.
+  unbound-checkconf
+  systemctl restart unbound
+  dig AAAA ipv4only.arpa @2001:db8:53::53
+  - unbound-checkconf should report no errors.
+  - The dig answer should contain 64:ff9b::c000:aa.
+
+  4e. On the UE, check that the DNS64 address is reachable:
+  ping6 2001:db8:53::53
+
+  Step 5: Give the DNS64 address to the UE (free5gc SMF)
+
+  In the smfcfg.yaml that the SMF on cn loads, find the snssaiInfos entry with
+  sst: 1 and sd: 000001. In this repository that is around line 64. Under dnn: 
+  fast.t-mobile.com, change one line:
+          - dnn: fast.t-mobile.com # Data Network Name
+            dns: # the IP address of DNS
+              ipv4: 8.8.8.8
+              ipv6: 2001:db8:53::53
+  Then restart free5gc so that the SMF reads the new config. upfcfg.yaml does
+  not need any change.
+
+  Step 6: Full test on the UE
+
+  1. Re-establish the fast.t-mobile.com IPv6-only PDU session, so the UE
+     receives the new DNS server.
+  2. Check that the UE's DNS server is 2001:db8:53::53.
+  3. Remove the hand-set CLAT prefix from Step 3, so the CLAT has to discover
+     the prefix through DNS64.
+  4. ping 8.8.8.8 and resolve a hostname from the LAN client.
+  5. On cn, jool -i plat session display --numeric should list TCP, UDP, or ICMP
+     sessions from the UE.
+
+  Notes
+
+  - Reboot. Steps 1, 2b, and 4a do not survive a reboot. unbound does, because
+    it is a systemd service. After a reboot, run the two sysctl commands,
+    modprobe jool, the jool instance add command, and the ip -6 addr add command
+    again. I can make them persistent later if you want.
+  - Private IPv4 targets. Jool does not translate the well-known prefix
+    64:ff9b::/96 to private IPv4 addresses (RFC 6052). Test against public
+    addresses such as 8.8.8.8, not lab 10.x or 192.168.x hosts.
+  - Uplink rule. The SMF uplink rule permit out ip from assigned to any already
+    allows 64:ff9b::/96 and 2001:db8:53::53. No PDR change is needed.
+
+✻ Baked for 34s · done Tuesday 6:07 PM
+
+❯ 5.15.0-198-generic                                                            
+  8.8.8.8 via 192.168.6.1 dev enp5s0 src 192.168.6.168 uid 0                    
+      cache                                                                     
+  net.ipv4.ip_forward = 1                                                       
+  net.ipv6.conf.all.forwarding = 1                                              
+  In step 2b, why use "64:ff9b::/96" is it for specific rule?                   
+                                                                                
+    jool instance add "plat" --netfilter --pool6 64:ff9b::/96                   
+
+● API Error: Connection lost mid-response. The response above may be 
+  incomplete.
+
+✻ Cooked for 20s · done Tuesday 6:11 PM
+
+❯ ● API Error: Connection lost mid-response. The response above may be          
+  incomplete.                                                                   
+  I got above error, can you resend your answer again?                          
+
+● Why 64:ff9b::/96
+
+  --pool6 tells Jool which IPv6 destination addresses to translate. Jool
+  translates a packet only when its destination is inside 64:ff9b::/96. Every
+  other IPv6 packet passes through cn unchanged, for example the existing
+  traffic to 2001:db8:126::1.
+
+  ★ Insight ─────────────────────────────────────
+  - 64:ff9b::/96 is the Well-Known Prefix that RFC 6052 reserves for IPv4/IPv6
+    translation. The /96 leaves the last 32 bits for an IPv4 address. Jool takes
+    the IPv4 destination straight from those 32 bits:
+    64:ff9b::808:808 → last 32 bits 0808:0808 → 8.8.8.8
+    64:ff9b::c000:aa → c0.00.00.aa → 192.0.0.170
+    No per-host rule or table is needed. One prefix covers the whole IPv4
+    Internet.
+  - The same prefix must be configured in three places, or packets go to a
+    prefix that nobody translates:
+    a. Jool --pool6 64:ff9b::/96 (the PLAT, Step 2b)
+    b. unbound dns64-prefix: 64:ff9b::/96 (the address DNS64 builds into AAAA
+       answers, Step 4c)
+    c. The CLAT prefix on the UE: either ip6prefix set by hand, or the prefix
+       the UE discovers by looking up ipv4only.arpa through DNS64
+  - An operator can use its own prefix instead, a Network-Specific Prefix such
+    as 2001:db8:64::/96. The test request from the CPE team asked for
+    64:ff9b::/96, so these steps keep it. The prefix has one limit: RFC 6052
+    does not allow the Well-Known Prefix to embed private IPv4 destinations such
+    as 10.x or 192.168.x, and Jool enforces this. Public destinations like
+    8.8.8.8 work.
+    ─────────────────────────────────────────────────
+
+  Your Step 0 output
+
+  - Kernel 5.15.0-198-generic. This is the Ubuntu 22.04 kernel. The Ubuntu 22.04
+    jool-dkms package supports kernel 5.15, so Step 2a should build without
+    problems. Still check dkms status | grep jool after the install.
+  - IPv4 egress through enp5s0, source 192.168.6.168, gateway 192.168.6.1. Jool
+    will use 192.168.6.168 as the shared IPv4 source address of translated
+    packets. The address is private, so the lab router 192.168.6.1 translates it
+    again (normal IPv4 NAT) toward the Internet. That is fine. The
+    private-address limit above applies only to the destination inside
+    64:ff9b::/96, not to Jool's own source address.
+  - Forwarding is already on (ip_forward = 1, all.forwarding = 1), so you can
+    skip Step 1.
+
+  Your next command is Step 2a:
+  apt install -y linux-headers-$(uname -r) jool-dkms jool-tools
+  dkms status | grep jool
+
+✻ Cogitated for 17s · done Tuesday 6:12 PM
+
+※ recap: You're setting up NAT64 (PLAT) and DNS64 on the cn host so the UE's CLAT can be tested, and forwarding is already on. Next, run Step 2a: apt install linux-headers-$(uname -r) jool-dkms jool-tools, then check dkms status. (disable recaps in /config)
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]#   dkms status | grep jool                
+  jool-dkms/4.1.7, 5.15.0-198-generic, x86_64: installed                        
+  [root@75N0-01N0SA-sled2-CN free5gc]#   modprobe jool                          
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+                                                                                
+  What is next?                                                                 
+
+● Jool 4.1.7 built for kernel 5.15.0-198-generic, and modprobe jool printed no
+  error, which means the module loaded. The next step is Step 2b: create the
+  NAT64 instance.
+
+  Create the instance. This command creates one stateful NAT64 instance named
+  plat. The instance translates every IPv6 packet whose destination is in
+  64:ff9b::/96, using the netfilter hook:
+  jool instance add "plat" --netfilter --pool6 64:ff9b::/96
+  If the command succeeds, it prints nothing.
+
+  Check the instance. These commands show that the instance exists and that its
+  prefix is right:
+  jool instance display
+  jool -i plat global display | grep -E "pool6|enabled"
+  Expected output:
+  - jool instance display prints a table with one row: name plat, framework
+    netfilter.
+  - The global display line should show pool6: 64:ff9b::/96 and
+    manually-enabled: true.
+
+  Check the IPv4 side. This shows the IPv4 address pool:
+  jool -i plat pool4 display
+  An empty table is the expected result. With an empty pool4, Jool uses the
+  egress address 192.168.6.168 on enp5s0, with ports 61001–65535.
+
+  ★ Insight ─────────────────────────────────────
+  - modprobe jool only loads the translator code into the kernel. Until jool 
+    instance add runs, Jool translates nothing and all traffic is unchanged.
+    Removing the instance (jool instance remove "plat") undoes the whole PLAT in
+    one command, which is useful if something on cn misbehaves during the test.
+  - --netfilter hooks Jool into every network namespace interface's PREROUTING
+    stage. Packets that gtp5g hands to upfgtp pass through that stage, so no
+    route for 64:ff9b::/96 is needed.
+    ─────────────────────────────────────────────────
+
+  After that, run Step 3 on the UE: bring up the fast.t-mobile.com IPv6-only PDU
+  session and run ping6 64:ff9b::808:808. Then run this on cn and paste the
+  output of both:
+  jool -i plat session display --icmp --numeric
+
+✻ Cooked for 11s · done Tuesday 6:20 PM
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]#   jool instance add "plat" --netfilter   
+  --pool6 64:ff9b::/96                                                          
+  [root@75N0-01N0SA-sled2-CN free5gc]#   jool instance display                  
+  +--------------------+-----------------+-----------+                          
+  |          Namespace |            Name | Framework |                          
+  +--------------------+-----------------+-----------+                          
+  |           b482ac00 |            plat | netfilter |                          
+  +--------------------+-----------------+-----------+                          
+  [root@75N0-01N0SA-sled2-CN free5gc]#   jool -i plat global display | grep -E  
+  "pool6|enabled"                                                               
+    manually-enabled: true                                                      
+    pool6: 64:ff9b::/96                                                         
+    ss-enabled: false                                                           
+  [root@75N0-01N0SA-sled2-CN free5gc]#   jool -i plat pool4 display             
+  +------------+-------+--------------------+-----------------+-------------+   
+  |       Mark | Proto |     Max iterations |         Address |       Ports |   
+  +------------+-------+--------------------+-----------------+-------------+   
+  +------------+-------+--------------------+-----------------+-------------+   
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+
+● All three outputs are correct:
+  - The plat instance exists and uses the netfilter framework.
+  - pool6 is 64:ff9b::/96, and manually-enabled: true means the instance is
+    translating.
+  - pool4 is empty, so Jool will use 192.168.6.168 on enp5s0 as the shared IPv4
+    source.
+
+  ss-enabled: false refers to Jool's session synchronization feature, which
+  copies NAT64 sessions between two Jool hosts for failover. One NAT64 host does
+  not need it.
+
+  Next: Step 3, test the PLAT from the UE
+
+  On cn, start two packet captures first. These show the IPv6 packet arriving
+  from the UE and the translated IPv4 packet leaving cn. If the ping fails, they
+  show which side stops. Run each command in its own terminal on cn:
+  tcpdump -ni upfgtp ip6 and net 64:ff9b::/96
+  tcpdump -ni enp5s0 icmp and host 8.8.8.8
+
+  On the UE, bring up the fast.t-mobile.com IPv6-only PDU session, then run:
+  ping6 -c 4 64:ff9b::808:808
+
+  On cn, list the NAT64 sessions:
+  jool -i plat session display --icmp --numeric
+
+  How to read the result
+
+  ┌────────────┬────────────┬───────────────────────────────────────────────┐
+  │  upfgtp    │  enp5s0    │                    Meaning                    │
+  │  capture   │  capture   │                                               │
+  ├────────────┼────────────┼───────────────────────────────────────────────┤
+  │ request    │ request    │ The PLAT works. The UE should get replies.    │
+  │ and reply  │ and reply  │                                               │
+  ├────────────┼────────────┼───────────────────────────────────────────────┤
+  │ request    │ nothing    │ Jool did not translate. Paste dmesg | grep -i │
+  │ only       │            │  jool.                                        │
+  ├────────────┼────────────┼───────────────────────────────────────────────┤
+  │ request    │ request    │ The translated packet left cn, but 8.8.8.8    │
+  │ only       │ only       │ did not reply. Check that 192.168.6.1 NATs    │
+  │            │            │ 192.168.6.168 to the Internet.                │
+  ├────────────┼────────────┼───────────────────────────────────────────────┤
+  │ nothing    │ nothing    │ The UE did not send the packet to the core.   │
+  │            │            │ Check the UE IPv6 default route.              │
+  └────────────┴────────────┴───────────────────────────────────────────────┘
+
+  ★ Insight ─────────────────────────────────────
+  - On enp5s0, the translated request should show source 192.168.6.168 and a
+    ping ID taken from Jool's 61001–65535 range. Jool replaces the ICMP
+    identifier as well as the address, much like IPv4 NAT replaces a port. The
+    Jool session table maps that ID back to the UE's 2001:db8:121:... address
+    and original ping ID.
+    ─────────────────────────────────────────────────
+
+  Paste the UE ping output, both captures, and the session table.
+
+✻ Baked for 11s · done Tuesday 6:21 PM
+
+※ recap: You are adding a NAT64 gateway (the PLAT, using Jool) on the cn host so the UE's CLAT can be tested, and the Jool `plat` instance is now running. Next, start the two tcpdump captures on cn, then run `ping6 -c 4 64:ff9b::808:808` from the UE. (disable recaps in /config)
+
+❯ On UE:                                                                        
+  ~ #   ping -6 -c 4 -I ccmni2 64:ff9b::808:808                                 
+  PING 64:ff9b::808:808(64:ff9b::808:808) from 2001:db8:131:1::2 ccmni2: 56     
+  data bytes                                                                    
+  64 bytes from 64:ff9b::808:808: icmp_seq=1 ttl=114 time=15.4 ms               
+  64 bytes from 64:ff9b::808:808: icmp_seq=2 ttl=114 time=14.3 ms               
+  64 bytes from 64:ff9b::808:808: icmp_seq=3 ttl=114 time=13.3 ms               
+  64 bytes from 64:ff9b::808:808: icmp_seq=4 ttl=114 time=14.2 ms               
+                                                                                
+  --- 64:ff9b::808:808 ping statistics ---                                      
+  4 packets transmitted, 4 received, 0% packet loss, time 3006ms                
+  rtt min/avg/max/mdev = 13.347/14.317/15.408/0.731 ms                          
+  ~ #                                                                           
+  On CN:                                                                        
+  [root@75N0-01N0SA-sled2-CN free5gc]#   tcpdump -ni upfgtp ip6 and net         
+  64:ff9b::/96                                                                  
+  tcpdump: verbose output suppressed, use -v[v]... for full protocol decode     
+  listening on upfgtp, link-type RAW (Raw IP), snapshot length 262144 bytes     
+  18:28:28.023754 IP6 2001:db8:131:1::2 > 64:ff9b::808:808: ICMP6, echo         
+  request, id 39185, seq 1, length 64                                           
+  18:28:28.028681 IP6 64:ff9b::808:808 > 2001:db8:131:1::2: ICMP6, echo reply,  
+  id 39185, seq 1, length 64                                                    
+  18:28:29.023726 IP6 2001:db8:131:1::2 > 64:ff9b::808:808: ICMP6, echo         
+  request, id 39185, seq 2, length 64                                           
+  18:28:29.028143 IP6 64:ff9b::808:808 > 2001:db8:131:1::2: ICMP6, echo reply,  
+  id 39185, seq 2, length 64                                                    
+  18:28:30.026216 IP6 2001:db8:131:1::2 > 64:ff9b::808:808: ICMP6, echo         
+  request, id 39185, seq 3, length 64                                           
+  18:28:30.030945 IP6 64:ff9b::808:808 > 2001:db8:131:1::2: ICMP6, echo reply,  
+  id 39185, seq 3, length 64                                                    
+  18:28:31.028722 IP6 2001:db8:131:1::2 > 64:ff9b::808:808: ICMP6, echo         
+  request, id 39185, seq 4, length 64                                           
+  18:28:31.033316 IP6 64:ff9b::808:808 > 2001:db8:131:1::2: ICMP6, echo reply,  
+  id 39185, seq 4, length 64                                                    
+  ^C                                                                            
+  8 packets captured                                                            
+  8 packets received by filter                                                  
+  0 packets dropped by kernel                                                   
+  [root@75N0-01N0SA-sled2-CN free5gc]# jool -i plat session display --icmp      
+  --numeric                                                                     
+  ---------------------------------                                             
+  Expires in 0:00:19.596                                                        
+  Remote: 8.8.8.8#63195    2001:db8:131:1::2#39185                              
+  Local: 192.168.6.168#63195    64:ff9b::808:808#39185                          
+  ---------------------------------                                             
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+  [root@75N0-01N0SA-sled2-CN free5gc]#   tcpdump -ni enp5s0 icmp and host       
+  8.8.8.8                                                                       
+  tcpdump: verbose output suppressed, use -v[v]... for full protocol decode     
+  listening on enp5s0, link-type EN10MB (Ethernet), snapshot length 262144      
+  bytes                                                                         
+  18:28:28.023825 IP 192.168.6.168 > 8.8.8.8: ICMP echo request, id 63195, seq  
+  1, length 64                                                                  
+  18:28:28.028640 IP 8.8.8.8 > 192.168.6.168: ICMP echo reply, id 63195, seq 1, 
+  length 64                                                                     
+  18:28:29.023787 IP 192.168.6.168 > 8.8.8.8: ICMP echo request, id 63195, seq  
+  2, length 64                                                                  
+  18:28:29.028112 IP 8.8.8.8 > 192.168.6.168: ICMP echo reply, id 63195, seq 2, 
+  length 64                                                                     
+  18:28:30.026273 IP 192.168.6.168 > 8.8.8.8: ICMP echo request, id 63195, seq  
+  3, length 64                                                                  
+  18:28:30.030914 IP 8.8.8.8 > 192.168.6.168: ICMP echo reply, id 63195, seq 3, 
+  length 64                                                                     
+  18:28:31.028779 IP 192.168.6.168 > 8.8.8.8: ICMP echo request, id 63195, seq  
+  4, length 64                                                                  
+  18:28:31.033285 IP 8.8.8.8 > 192.168.6.168: ICMP echo reply, id 63195, seq 4, 
+  length 64                                                                     
+  ^C                                                                            
+  8 packets captured                                                            
+  8 packets received by filter                                                  
+  0 packets dropped by kernel                                                   
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+
+● The PLAT works. All four pings got replies with 0% loss. The captures show
+  each step of the translation:
+
+  ┌─────────────────┬───────────────────────────────────────────────────────┐
+  │      Point      │                        Packet                         │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ upfgtp, from UE │ 2001:db8:131:1::2 → 64:ff9b::808:808, ICMPv6 echo     │
+  │                 │ request, id 39185                                     │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ enp5s0, after   │ 192.168.6.168 → 8.8.8.8, ICMP echo request, id 63195  │
+  │ Jool            │                                                       │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ enp5s0, reply   │ 8.8.8.8 → 192.168.6.168, id 63195                     │
+  ├─────────────────┼───────────────────────────────────────────────────────┤
+  │ upfgtp, to UE   │ 64:ff9b::808:808 → 2001:db8:131:1::2, ICMPv6 echo     │
+  │                 │ reply, id 39185                                       │
+  └─────────────────┴───────────────────────────────────────────────────────┘
+
+  The Jool session line 192.168.6.168#63195 ↔ 2001:db8:131:1::2#39185 is the
+  mapping that turns each reply back into IPv6. Jool also replaced the ping ID:
+  39185 became 63195, a value from Jool's 61001–65535 range.
+
+  ★ Insight ─────────────────────────────────────
+  - The time between the IPv6 request on upfgtp and the IPv4 request on enp5s0
+    is about 0.07 ms (.023754 → .023825). That is in-kernel translation, with no
+    user-space hop. The 14 ms round trip is almost all Internet latency to
+    8.8.8.8.
+  - The UE ping came from 2001:db8:131:1::2 on ccmni2. That address is in the
+    2001:db8:131::/48 pool, not in the 2001:db8:121::/48 pool of the test PDN in
+    the CPE team's request. The PLAT works for any UE prefix, because Jool
+    matches only the destination. Step 5 (DNS) is different: dns.ipv6 is set per
+    slice and per DNN in smfcfg.yaml. The change must therefore go into the
+    slice that the PDU session under test really uses.
+    ─────────────────────────────────────────────────
+
+  I'll check which slice and DNN the 2001:db8:131::/48 pool belongs to. That
+  decides where the Step 5 DNS change goes.
+
+● Bash(sed -n 50,60p config/upfcfg.yaml)
+  ⎿        sst: 1
+           sd: "000001"
+       - dnn: fast.t-mobile.com # Data Network Name
+     … +10 lines (ctrl+o to expand)
+
+● Bash(sed -n 60,63p config/upfcfg.yaml)
+  ⎿        sst: 1
+           sd: "0007d0"
+       - dnn: fast.t-mobile.com # Data Network Name
+     … +2 lines (ctrl+o to expand)
+
+● In the local config/upfcfg.yaml, the 2001:db8:131::/48 pool belongs to
+  fast.t-mobile.com on slice SST 1, SD 0007d0. The test PDN in the CPE team's
+  request (2001:db8:121::/48) is on SD 000001. If cn loads the same file, the
+  UE's ccmni2 session is on SD 0007d0. Step 5 must then change dns.ipv6 in the
+  smfcfg.yaml snssaiInfos entry for SST 1 / SD 0007d0, or in both entries if you
+  test both slices.
+
+  Next: Step 4, DNS64 server on cn
+
+  4a. Add the dedicated DNS64 address to the loopback interface:
+  ip -6 addr add 2001:db8:53::53/128 dev lo
+
+  4b. Install unbound and check that its include directory exists:
+  apt install -y unbound
+  ls /etc/unbound/unbound.conf.d/
+
+  4c. Write the DNS64 configuration file, one line of the file per command:
+  echo 'server:' | tee /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  interface: 2001:db8:53::53' | tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  ip-freebind: yes' | tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  access-control: 2001:db8::/32 allow' | tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  module-config: "dns64 validator iterator"' | tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  dns64-prefix: 64:ff9b::/96' | tee -a
+  /etc/unbound/unbound.conf.d/dns64.conf
+  echo 'forward-zone:' | tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  name: "."' | tee -a /etc/unbound/unbound.conf.d/dns64.conf
+  echo '  forward-addr: 8.8.8.8' | tee -a /etc/unbound/unbound.conf.d/dns64.conf
+
+  4d. Check the configuration, restart unbound, and test DNS64 from cn:
+  unbound-checkconf
+  systemctl restart unbound
+  dig AAAA ipv4only.arpa @2001:db8:53::53
+  The dig answer should contain 64:ff9b::c000:aa and 64:ff9b::c000:ab.
+
+  4e. On the UE, check that the DNS64 server is reachable and answers:
+  ping -6 -c 4 -I ccmni2 2001:db8:53::53
+  nslookup -type=AAAA ipv4only.arpa 2001:db8:53::53
+  If the UE's BusyBox nslookup does not accept -type=AAAA, use nslookup 
+  ipv4only.arpa 2001:db8:53::53 and look for the 64:ff9b:: addresses.
+
+  Paste the outputs of 4d and 4e. The next step is Step 5, the smfcfg.yaml
+  change. Before that, please confirm which smfcfg.yaml path the SMF on cn
+  loads, and which slice (SD 0007d0 or 000001) the CLAT test should use.
+
+✻ Worked for 26s · done Tuesday 6:30 PM
+
+※ recap: You're adding a NAT64 gateway on `cn` so you can test the UE's CLAT, and the UE's ping to 8.8.8.8 through Jool already works. Next, run Step 4 to set up the DNS64 server (`unbound` on `2001:db8:53::53`) and paste the `dig` output.
+
+❯ [root@75N0-01N0SA-sled2-CN free5gc]#   ls /etc/unbound/unbound.conf.d/        
+  root-auto-trust-anchor-file.conf                                              
+  [root@75N0-01N0SA-sled2-CN free5gc]#   echo 'server:' | tee                   
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  interface: 2001:db8:53::53' | tee -a                                
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  ip-freebind: yes' | tee -a /etc/unbound/unbound.conf.d/dns64.conf   
+    echo '  access-control: 2001:db8::/32 allow' | tee -a                       
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  module-config: "dns64 validator iterator"' | tee -a                 
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo '  dns64-prefix: 64:ff9b::/96' | tee -a                                
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+    echo 'forward-zone:' | tee -a /etc/unbound/unbound.conf.d/dns64.conf        
+    echo '  name: "."' | tee -a /etc/unbound/unbound.conf.d/dns64.conf          
+    echo '  forward-addr: 8.8.8.8' | tee -a                                     
+  /etc/unbound/unbound.conf.d/dns64.conf                                        
+  server:                                                                       
+    interface: 2001:db8:53::53                                                  
+    ip-freebind: yes                                                            
+    access-control: 2001:db8::/32 allow                                         
+    module-config: "dns64 validator iterator"                                   
+    dns64-prefix: 64:ff9b::/96                                                  
+  forward-zone:                                                                 
+    name: "."                                                                   
+    forward-addr: 8.8.8.8                                                       
+  [root@75N0-01N0SA-sled2-CN free5gc]#   unbound-checkconf                      
+  unbound-checkconf: no errors in /etc/unbound/unbound.conf                     
+  [root@75N0-01N0SA-sled2-CN free5gc]#   systemctl restart unbound              
+  [root@75N0-01N0SA-sled2-CN free5gc]#   dig AAAA ipv4only.arpa                 
+  @2001:db8:53::53                                                              
+                                                                                
+  ; <<>> DiG 9.18.39-0ubuntu0.22.04.6-Ubuntu <<>> AAAA ipv4only.arpa            
+  @2001:db8:53::53                                                              
+  ;; global options: +cmd                                                       
+  ;; Got answer:                                                                
+  ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 34859                     
+  ;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1          
+                                                                                
+  ;; OPT PSEUDOSECTION:                                                         
+  ; EDNS: version: 0, flags:; udp: 1232                                         
+  ;; QUESTION SECTION:                                                          
+  ;ipv4only.arpa.            IN    AAAA                                         
+                                                                                
+  ;; ANSWER SECTION:                                                            
+  ipv4only.arpa.        17981    IN    AAAA    64:ff9b::c000:ab                 
+  ipv4only.arpa.        17981    IN    AAAA    64:ff9b::c000:aa                 
+                                                                                
+  ;; Query time: 36 msec                                                        
+  ;; SERVER: 2001:db8:53::53#53(2001:db8:53::53) (UDP)                          
+  ;; WHEN: Tue Oct 13 18:35:08 CST 2026                                         
+  ;; MSG SIZE  rcvd: 98                                                         
+                                                                                
+  [root@75N0-01N0SA-sled2-CN free5gc]#                                          
+  Can I continue step 4e now?                                                   
+                                                                                
+  I use st:1 sd: 0007D0 now, but in the reality, all PDNs will need to use      
+  PLAT.                                                                         
+
+● Yes, continue with Step 4e. Step 4d worked:
+  - unbound-checkconf reported no errors.
+  - dig returned both synthesized answers, 64:ff9b::c000:aa and
+    64:ff9b::c000:ab. These are 192.0.0.170 and 192.0.0.171 placed inside the
+    NAT64 prefix.
+  - The dig query reached 2001:db8:53::53, so the lo address from Step 4a is in
+    place.
+
+  Step 4e on the UE:
+  ping -6 -c 4 -I ccmni2 2001:db8:53::53
+  nslookup -type=AAAA ipv4only.arpa 2001:db8:53::53
+
+  All PDNs using the PLAT
+
+  The PLAT part already covers every PDN. Jool matches only the destination
+  prefix 64:ff9b::/96, and it ignores which slice, DNN, or UE pool a packet
+  comes from. Every UE prefix is routed through upfgtp on cn, so any PDU session
+  that sends to 64:ff9b::/96 is translated.
+
+  Only the DNS part is set per slice and per DNN. I'll count how many dns.ipv6
+  entries in the local smfcfg.yaml would need the new address.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● In the local config/smfcfg.yaml there are 56 dns.ipv6 entries, one for each
+  slice and DNN combination. All 56 are 2001:4860:4860::8888, and no entry uses
+  another value. To give every PDN the DNS64 server, all 56 need to change to
+  2001:db8:53::53. Because they are identical, one sed replacement on cn can
+  change them, after a backup:
+  cp <smfcfg.yaml path> <smfcfg.yaml path>.bak-before-dns64
+  sed -i 's/ipv6: 2001:4860:4860::8888/ipv6: 2001:db8:53::53/' <smfcfg.yaml
+  path>
+  grep -c "ipv6: 2001:db8:53::53" <smfcfg.yaml path>
+  The last command should print 56, if the file on cn matches the local file.
+  After that, restart free5gc so the SMF reads the change.
+
+  ★ Insight ─────────────────────────────────────
+  - On dual-stack PDNs (IPv4 and IPv6), DNS64 changes behavior. For a host that
+    has only an IPv4 address, unbound now returns a synthesized 64:ff9b:: AAAA
+    record. The UE usually prefers IPv6, so its traffic to that host goes
+    through Jool even though the UE also has a native IPv4 address. Traffic
+    still works, but it takes the NAT64 path. IPv6-only operator networks work
+    the same way. On a dual-stack test, though, a capture will show 64:ff9b::
+    traffic where native IPv4 traffic used to be.
+  - The ipv4: 8.8.8.8 lines stay unchanged. Dual-stack sessions keep their IPv4
+    DNS server, and an IPv6-only session never receives an IPv4 DNS server.
+  - ims and sos sessions also get the DNS64 server under the replace-all
+    approach. IMS on a real network usually finds its servers through P-CSCF
+    addresses rather than this DNS. If IMS tests behave differently afterward,
+    those two DNNs are the first to roll back.
+    ─────────────────────────────────────────────────
+
+  Please paste the Step 4e output. Also tell me:
+  1. The path of the smfcfg.yaml that the SMF on cn loads. For example, check ps
+     -ef | grep smf for a -c argument.
+  2. Whether this local repository's config/smfcfg.yaml should get the same
+     56-line change, so the repository and cn stay the same.
+
+✻ Crunched for 22s · done Tuesday 6:38 PM
+❯ ~ #   ping -6 -c 4 -I ccmni2 2001:db8:53::53                                  
+  PING 2001:db8:53::53(2001:db8:53::53) from 2001:db8:131:1::2 ccmni2: 56 data  
+  bytes                                                                         
+  64 bytes from 2001:db8:53::53: icmp_seq=1 ttl=64 time=8.54 ms                 
+  64 bytes from 2001:db8:53::53: icmp_seq=2 ttl=64 time=9.21 ms                 
+  64 bytes from 2001:db8:53::53: icmp_seq=3 ttl=64 time=10.2 ms                 
+  64 bytes from 2001:db8:53::53: icmp_seq=4 ttl=64 time=9.52 ms                 
+                                                                                
+  --- 2001:db8:53::53 ping statistics ---                                       
+  4 packets transmitted, 4 received, 0% packet loss, time 3004ms                
+  rtt min/avg/max/mdev = 8.538/9.366/10.193/0.595 ms                            
+  ~ #   nslookup -type=AAAA ipv4only.arpa 2001:db8:53::53                       
+  ;; connection timed out; no servers could be reached                          
+                                                                                
+  ~ #                                                                           
+  Can you move original 2001:4860:4860::8888 smf to smfcfg_google_dns.yaml      
+  first?                                                                        
+
+● Two things below: the DNS timeout on the UE, and the config copy you asked
+  for.
+
+  The nslookup timeout
+
+  The ping succeeded but the DNS query timed out, so the address is reachable
+  and something specific to the DNS query fails. The two commands differ in one
+  important way. ping used -I ccmni2, which forces the source 2001:db8:131:1::2
+  and the ccmni2 interface. BusyBox nslookup has no -I option, so the UE kernel
+  chooses the interface from its IPv6 routing table. On this UE, IPv6 routing
+  across several PDN interfaces caused trouble before. If the IPv6 default route
+  points to another ccmni interface, or there is none, the query never reaches
+  ccmni2.
+
+  These two checks show where the query goes. Run the capture on cn first, then
+  the commands on the UE:
+  tcpdump -ni upfgtp port 53
+  ip -6 route get 2001:db8:53::53
+  nslookup -type=AAAA ipv4only.arpa 2001:db8:53::53
+  - If ip -6 route get shows a device other than ccmni2, or Network unreachable,
+    the UE routing is the cause. The PLAT and DNS64 on cn are not involved.
+  - If tcpdump shows the query arriving but no reply, the cause is on cn. In
+    that case paste ip6tables -S INPUT and journalctl -u unbound -n 20.
+
+  Copying the original smfcfg.yaml
+
+  Before the copy, a question about what "move" should do. mv would leave no
+  config/smfcfg.yaml, and the SMF reads that file at startup. So I will copy the
+  file instead. After the copy, config/smfcfg_google_dns.yaml holds the
+  original Google DNS version, and config/smfcfg.yaml stays in place for the
+  DNS64 change.
+
+  This command copies config/smfcfg.yaml (in this local repository) to
+  config/smfcfg_google_dns.yaml, then counts the Google DNS lines in the copy to
+  check that the copy is complete:
+
+● Bash(cp -n config/smfcfg.yaml config/smfcfg_google_dns.yaml && cmp
+      config/smfcfg.yaml config/smfcfg_google_dns.yaml && grep -c "ipv6:
+      2001:4860:4860::8888" config/sm…)
+  ⎿  56
+
+● I copied config/smfcfg.yaml to config/smfcfg_google_dns.yaml in this local
+  repository. cmp found no difference between the two files, and the copy has
+  all 56 ipv6: 2001:4860:4860::8888 lines. config/smfcfg.yaml has not changed
+  yet.
+
+  This copy exists only in the local repository. To keep the same backup on cn,
+  run the same copy in the free5gc directory there. cp -n does not overwrite a
+  file that already exists:
+  cp -n config/smfcfg.yaml config/smfcfg_google_dns.yaml
+
+  ★ Insight ─────────────────────────────────────
+  - To switch back to Google DNS later, either copy smfcfg_google_dns.yaml back
+    over smfcfg.yaml, or start the SMF with -c ./config/smfcfg_google_dns.yaml.
+    free5gc NFs take their config path from the -c option.
+    ─────────────────────────────────────────────────
+
+  Next, should I change the 56 dns.ipv6 lines in the local config/smfcfg.yaml to
+  2001:db8:53::53? I would hold that until the nslookup timeout is explained.
+  Otherwise every PDN would get a DNS server that the UE cannot use yet.
+
+✻ Cogitated for 26s · done Tuesday 6:41 PM
+
+❯ On UE:                                                                        
+  ~ #   ip -6 route get 2001:db8:53::53                                         
+  2001:db8:53::53 from :: via fe80::1 dev ccmni1 proto static src               
+  2001:db8:131:1::2 metric 1024 pref medium                                     
+  ~ #   nslookup -type=AAAA ipv4only.arpa 2001:db8:53::53                       
+  ;; connection timed out; no servers could be reached                          
+                                                                                
+  ~ #                                                                           
+  My ccmni1 cannot reach to CN now, that's why I use ccmni2 to test.            
+
+● That output explains the timeout, and the cause is on the UE, not on cn.
+
+  The UE kernel sends traffic for 2001:db8:53::53 out of ccmni1 (via fe80::1 dev
+  ccmni1), because that is the route it matches. Since ccmni1 cannot reach the
+  core right now, the DNS query is lost there. ping -I ccmni2 worked only
+  because -I forced the interface. BusyBox nslookup has no such option, so it
+  follows the routing table.
+
+  There is a second problem in the same line. The source address is src 
+  2001:db8:131:1::2, which is ccmni2's address, yet the packet leaves through
+  ccmni1. Even if ccmni1 were working, its PDU session would carry a packet
+  whose source is another session's address. The UPF matches uplink packets to a
+  session by the UE address. Such a packet would therefore not match the ccmni1
+  session and would be dropped.
+
+  ★ Insight ─────────────────────────────────────
+  - Each ccmni interface is a separate PDU session with its own GTP-U tunnel and
+    its own UE prefix. A packet only works when its source address belongs to
+    the session whose interface it leaves through. Without per-interface routing
+    on the UE, the default route decides, and the source address is picked
+    separately. That mismatch is the same multi-PDN IPv6 routing problem seen
+    earlier on slices 131/141.
+  - The same rule applies to the CLAT. The CLAT sends its translated IPv6
+    packets to 64:ff9b::/96, and the routing table decides which ccmni they
+    leave through. ping -6 64:ff9b::808:808 worked earlier only because of -I 
+    ccmni2. Without a route for 64:ff9b::/96 through ccmni2, CLAT traffic would
+    take ccmni1 and fail in the same way.
+    ─────────────────────────────────────────────────
+
+  Fix for the test: two host routes on the UE through ccmni2
+
+  1. Route the DNS64 server through ccmni2. This adds a route for the single
+  address 2001:db8:53::53 with a lower metric than the ccmni1 route (1024), so
+  the kernel prefers it:
+  ip -6 route add 2001:db8:53::53/128 via fe80::1 dev ccmni2 metric 100
+
+  2. Route the NAT64 prefix through ccmni2. This does the same for everything
+  the CLAT sends:
+  ip -6 route add 64:ff9b::/96 via fe80::1 dev ccmni2 metric 100
+
+  3. Check both routes, then retry the query:
+  ip -6 route get 2001:db8:53::53
+  ip -6 route get 64:ff9b::808:808
+  nslookup -type=AAAA ipv4only.arpa 2001:db8:53::53
+  - Both route get lines should now show dev ccmni2.
+  - nslookup should return 64:ff9b::c000:aa and 64:ff9b::c000:ab.
+
+  To remove the routes after the test, run ip -6 route del 2001:db8:53::53/128 
+  dev ccmni2 and ip -6 route del 64:ff9b::/96 dev ccmni2.
+
+  These routes are a workaround for this test. In a real deployment, the CPE
+  must route the CLAT and DNS traffic through the PDN interface that carries the
+  CLAT, whichever ccmni that is. That routing belongs to the UE's PDN handling,
+  not to the core.
+
+✻ Churned for 18s · done Tuesday 6:42 PM
+
+❯ ~ #   ip -6 route get 2001:db8:53::53                                         
+  2001:db8:53::53 from :: via fe80::1 dev ccmni2 src 2001:db8:131:1::2 metric   
+  100 pref medium                                                               
+  ~ #   ip -6 route get 64:ff9b::808:808                                        
+  64:ff9b::808:808 from :: via fe80::1 dev ccmni2 src 2001:db8:131:1::2 metric  
+  100 pref medium                                                               
+  ~ #   nslookup -type=AAAA ipv4only.arpa 2001:db8:53::53                       
+  Server:         2001:db8:53::53                                               
+  Address:        [2001:db8:53::53]:53                                          
+                                                                                
+  Non-authoritative answer:                                                     
+  Name:   ipv4only.arpa                                                         
+  Address: 64:ff9b::c000:ab                                                     
+  Name:   ipv4only.arpa                                                         
+  Address: 64:ff9b::c000:aa                                                     
+                                                                                
+  ~ #                                                                           
+
+● DNS64 works end to end from the UE. With both routes through ccmni2:
+  - The UE reaches the DNS64 server 2001:db8:53::53 through the ccmni2 PDU
+    session.
+  - unbound on cn answers with the synthesized 64:ff9b::c000:aa and
+    64:ff9b::c000:ab.
+  - Traffic to 64:ff9b::/96 also leaves through ccmni2, where the PLAT was
+    already proven in Step 3.
+
+  ★ Insight ─────────────────────────────────────
+  - This ipv4only.arpa lookup is the same lookup a CLAT makes for prefix
+    discovery (RFC 7050). The CLAT takes the first 96 bits of the answer
+    64:ff9b::c000:aa and drops the c000:aa part (which is 192.0.0.170). What
+    remains is 64:ff9b::/96. When the UE's DNS server is 2001:db8:53::53, the
+    CLAT should find the same prefix by itself, with no ip6prefix set by hand.
+    ─────────────────────────────────────────────────
+
+  Status
+
+  ┌────────────────────────────────────┬────────────────────────────────────┐
+  │                Part                │               Status               │
+  ├────────────────────────────────────┼────────────────────────────────────┤
+  │ PLAT (Jool on cn)                  │ Works: ping -6 64:ff9b::808:808    │
+  │                                    │ gets replies                       │
+  ├────────────────────────────────────┼────────────────────────────────────┤
+  │ DNS64 (unbound on cn)              │ Works: UE gets synthesized         │
+  │                                    │ 64:ff9b:: answers                  │
+  ├────────────────────────────────────┼────────────────────────────────────┤
+  │ UE gets 2001:db8:53::53 as DNS     │ Not yet: Step 5                    │
+  │ automatically                      │                                    │
+  ├────────────────────────────────────┼────────────────────────────────────┤
+  │ CLAT discovers the prefix and      │ Not yet: Step 6                    │
+  │ carries IPv4                       │                                    │
+  └────────────────────────────────────┴────────────────────────────────────┘
+
+  Next: Step 5, give the DNS64 address to the UE through the SMF
+
+  The original file is saved locally as config/smfcfg_google_dns.yaml. You said
+  that in the real network all PDNs must use the PLAT. The change would
+  therefore replace all 56 ipv6: 2001:4860:4860::8888 lines with ipv6: 
+  2001:db8:53::53.
+
+  Two things before I do it:
+  1. Should I make this change in the local config/smfcfg.yaml, in every slice
+     and DNN including ims and sos?
+  2. Which smfcfg.yaml path does the SMF on cn load? ps -ef | grep smf shows a
+     -c argument if one is used. You then copy the edited file to cn (or run the
+     same cp and sed there) and restart free5gc.
+
+✻ Cooked for 10s · done Tuesday 6:43 PM
+
+❯ 1. Yes                                                                        
+  2. You can edit smf config here, I will paste to remote CN.                   
+
+● This sed command replaces every ipv6: 2001:4860:4860::8888 line in the local
+  config/smfcfg.yaml with ipv6: 2001:db8:53::53. The grep commands then count
+  the new value and check that no old value remains.
+
+● Bash(sed -i 's/ipv6: 2001:4860:4860::8888/ipv6: 2001:db8:53::53/'
+      config/smfcfg.yaml && grep -c "ipv6: 2001:db8:53::53" config/smfcfg.yaml;
+      grep -c "2001:4860:4860"…)
+  ⎿  56
+     0
+     56
+
+● The change is done in the local config/smfcfg.yaml:
+  - 56 lines now read ipv6: 2001:db8:53::53.
+  - No 2001:4860:4860 address remains.
+  - diff against config/smfcfg_google_dns.yaml shows exactly 56 changed lines,
+    so nothing else in the file changed. The ipv4: 8.8.8.8 lines are unchanged.
+
+  Next steps
+
+  1. On cn, save the original, then put the new file in place. In the free5gc
+  directory on cn, keep the current file first:
+  cp -n config/smfcfg.yaml config/smfcfg_google_dns.yaml
+  Then paste the local config/smfcfg.yaml over config/smfcfg.yaml on cn, and
+  check it:
+  grep -c "ipv6: 2001:db8:53::53" config/smfcfg.yaml
+  grep -c "2001:4860:4860" config/smfcfg.yaml
+  The output should be 56 and 0.
+
+  2. Restart free5gc on cn, so the SMF reads the new file.
+
+  3. On the UE, re-establish the ccmni2 PDU session (fast.t-mobile.com, SST 1 /
+  SD 0007d0). Then check which DNS server the UE received. The method depends on
+  the UE. On an Android-based modem, getprop | grep -i dns usually lists the
+  DNS server for each ccmni interface. It should show 2001:db8:53::53.
+
+  4. Check the two UE routes from before. A new PDU session can bring the
+  interface down and up, and the kernel then removes routes that point at that
+  interface. If ip -6 route get 64:ff9b::808:808 no longer shows dev ccmni2, add
+  both routes again.
+
+  5. Step 6, the CLAT test. Remove any hand-set ip6prefix, start the CLAT on
+  ccmni2, and check:
+  - the CLAT reports the discovered prefix 64:ff9b::/96
+  - ping 8.8.8.8 works from the UE or from the LAN client
+  - on cn, jool -i plat session display --numeric lists sessions from
+    2001:db8:131:1:...
+
+  ★ Insight ─────────────────────────────────────
+  - The SMF reads dns.ipv6 only when a PDU session is established. A session
+    that already exists keeps the old DNS server until it is released and set up
+    again. That is why Step 3 re-establishes the session instead of only
+    restarting the SMF.
+    ─────────────────────────────────────────────────
+
+  The local changes (config/smfcfg.yaml and the new
+  config/smfcfg_google_dns.yaml) are not committed. Tell me if you want them
+  committed.
+
+✻ Cooked for 16s · done Tuesday 6:46 PM
+
+※ recap: The goal is a working PLAT so the UE's CLAT can be tested, and NAT64 and DNS64 on cn already work from the UE. Next, paste the updated local smfcfg.yaml onto cn, restart free5gc, and re-establish the ccmni2 PDU session.
+
+❯ It works.                                                                     
+
+● The full 464XLAT path now works: the UE CLAT translates IPv4 to IPv6, and Jool
+  on cn translates it back to IPv4.
+
+  I'll save a memory note with the current PLAT setup on cn. Future sessions
+  then know where the NAT64 and DNS64 live, and that they are not persistent.
+
+  Wrote 2 memories (ctrl+o to expand)
+
+● The 464XLAT test passed. The UE's CLAT turns IPv4 into IPv6, and Jool on cn
+  turns it back into IPv4. I saved a memory note with this setup for future
+  sessions.
+
+  What is now running on cn
+
+  Part: NAT64 (the PLAT)
+  Setting: Jool instance plat, prefix 64:ff9b::/96, outgoing IPv4 address
+  192.168.6.168 on enp5s0
+  Survives a reboot?: No. modprobe jool and jool instance add must be run again
+  ────────────────────────────────────────
+  Part: DNS64 address
+  Setting: 2001:db8:53::53/128 on lo
+  Survives a reboot?: No. ip -6 addr add must be run again
+  ────────────────────────────────────────
+  Part: DNS64 server
+  Setting: unbound, config in /etc/unbound/unbound.conf.d/dns64.conf
+  Survives a reboot?: Yes, it is a systemd service
+  ────────────────────────────────────────
+  Part: SMF DNS
+  Setting: All 56 dns.ipv6 entries in config/smfcfg.yaml set to 2001:db8:53::53.
+
+  The original is saved as config/smfcfg_google_dns.yaml
+  Survives a reboot?: Yes, it is a config file
+
+  Answers for the CPE team's request
+
+  1. Which core runs the UPF: the free5gc UPF (my-changes-v4.0.1 branch), using
+     the gtp5g kernel module, on the same host as the NAT64.
+  2. Can the UPF route 64:ff9b::/96 to a separate host: it can, but this lab
+     does not need it. The NAT64 runs on the UPF host itself.
+
+  The check from the request also passes: ping6 64:ff9b::808:808 from the UE
+  gets replies from 8.8.8.8.
+
+  Things still open
+
+  1. UE routing. The test only worked after you added two routes on the UE that
+     send 2001:db8:53::53 and 64:ff9b::/96 through ccmni2. The UE's default IPv6
+     route pointed to ccmni1, which cannot reach the core. In the field, the
+     CPE itself must send CLAT and DNS traffic through the PDN interface that
+     carries the CLAT. Tell the CPE team about this.
+  2. Reboot. After a reboot of cn, the Jool instance and the lo address are
+     gone. I can make them start at boot if you want.
+  3. Uncommitted files. The changed config/smfcfg.yaml and the new
+     config/smfcfg_google_dns.yaml are not committed. Tell me if you want them
+     committed.
+
+✻ Worked for 24s · done Tuesday 11:33 PM
+
+※ recap: You set up NAT64 and DNS64 on the cn host to test the UE's CLAT, and the test now passes. Next, decide whether to commit the smfcfg.yaml change and make the Jool setup survive a reboot.
