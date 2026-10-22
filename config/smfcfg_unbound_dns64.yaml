@@ -15,6 +15,13 @@ configuration:
       key: cert/smf.key # SMF TLS Certificate
       pem: cert/smf.pem # SMF TLS Private key
 
+  # #WNC PDU-DROP/CONFIG
+  # OAM API to drop and restore PDU sessions for UE recovery tests.
+  # skipOAuth true lets a plain curl call reach /nsmf-oam/v1/pdu-drop without an NRF token.
+  pduDrop:
+    enable: true
+    skipOAuth: true
+
   # the SBI services provided by this SMF, refer to TS 29.502
   serviceNameList:
     - nsmf-pdusession # Nsmf_PDUSession service
