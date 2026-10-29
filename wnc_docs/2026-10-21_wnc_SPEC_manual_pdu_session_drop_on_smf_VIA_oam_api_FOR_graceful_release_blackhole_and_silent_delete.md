@@ -243,4 +243,9 @@ These commands were derived from the NRF source and have not been run on the cn 
 
 - Drop entries are kept only in SMF memory. Restarting the SMF clears every entry.
 - The drop entry does not expire on its own. Only `DELETE` removes it.
-- Step 1 does not change the AMF, the UPF or the PCF.
+- Step 1 does not change the PCF. Step 1 originally left the AMF and the UPF unchanged too, but the fix for live test10 changed both: the AMF log names the 5GSM cause of every forwarded SMF reject, and the UPF's `RemoteSess` skips freed session slots. The ISSUE doc in section 11 explains both changes.
+
+## 11. Related
+
+- `2026-10-22_wnc_FINDING_ue_pdu_session_retry_NAMELY_3gpp_allows_ue_stops_retrying_when_no_backoff_5x3s_VS_backoff_t3396_60s_3x_VS_no_answer_t3580_16s.md` — how the test UE retried during the step 1 live tests, and why TS 24.501 allows the UE to stop retrying.
+- `2026-10-28_wnc_ISSUE_pdu_session_still_rejected_after_delete_pdu_drop_through_API_DUE_TO_upf_crash_on_orphan_session_from_graceful_drop.md` — the graceful drop sent no PFCP Session Deletion, and the orphan sessions it left crashed the UPF in live test10. The fix changes the SMF, the UPF and the AMF, and `## 10. Out of scope` was updated to say so.
