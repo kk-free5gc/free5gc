@@ -1032,3 +1032,5 @@ put in place.
 
 - `2026-10-21_wnc_SPEC_manual_pdu_session_drop_on_smf_VIA_oam_api_FOR_graceful_release_blackhole_and_silent_delete.md` — the design of the PDU drop API whose graceful mode caused this crash.
 - `2026-10-22_wnc_FINDING_ue_pdu_session_retry_NAMELY_3gpp_allows_ue_stops_retrying_when_no_backoff_5x3s_VS_backoff_t3396_60s_3x_VS_no_answer_t3580_16s.md` — how the test UE retries after a release or a reject, which explains the request pattern in test10.
+- `2026-10-29_wnc_HOWTO_manually_release_and_restore_pdu_session_VIA_smf_oam_pdu_drop_api.md` — the runbook for the drop and restore calls, whose §0 requires the SMF fix from this doc and whose §2 runs this doc's UPF crash check.
+- `2026-10-30_wnc_ISSUE_new_pdu_session_no_ipv6_prefix_and_release_request_unanswered_DUE_TO_smf_deletes_reused_up_seid_after_lost_release_complete.md` — a later failure that also depends on the UPF's free list described in §2: the UPF reused a freed UP SEID, and a stale PFCP deletion from the SMF hit the next PDU session.
