@@ -258,9 +258,13 @@ configuration:
   # can set up its default PDU session without looping. Bounded by the gNB RRC inactivity
   # timer. Default false = stock behaviour.
   treatInitialRegAsFollowOn: true
-  # WNC: useNasIdentityIfNgapSTmsiMissing selects where the AMF reads the UE's 5G-S-TMSI for a
-  # Service Request. The gNB forwards a Service Request to the AMF inside an NGAP
-  # InitialUEMessage. That one NGAP message can hold the 5G-S-TMSI in two different IEs:
+  # #WNC STMSI-FALLBACK/CONFIG
+  # nasIdentityFallbackIfNgapSTmsiMissing lists the NAS messages for which the AMF reads the
+  # UE identity from NAS when NGAP has none. It replaces the old bool
+  # useNasIdentityIfNgapSTmsiMissing. The AMF ignores that old key, so delete it.
+  #
+  # The gNB forwards the UE's first NAS message to the AMF inside an NGAP InitialUEMessage.
+  # That one NGAP message can hold the UE identity in two different IEs:
   #
   #   | IE                                   | Layer | Filled by | Value comes from                    |
   #   |--------------------------------------|-------|-----------|-------------------------------------|
@@ -268,24 +272,161 @@ configuration:
   #   |                                      |       |           | UE sends in RRCSetupRequest and     |
   #   |                                      |       |           | RRCSetupComplete                    |
   #   | NAS IE "5GS mobile identity" in the  | NAS   | UE        | The UE's NAS layer. TS 24.501       |
-  #   | Service Request, carried inside NGAP |       |           | requires this IE in every Service   |
-  #   | IE "NAS-PDU"                         |       |           | Request                             |
+  #   | Service Request, Registration        |       |           | requires this IE in all three       |
+  #   | Request or Deregistration Request,   |       |           | messages. A Service Request holds   |
+  #   | carried inside NGAP IE "NAS-PDU"     |       |           | the 5G-S-TMSI. A Registration or    |
+  #   |                                      |       |           | Deregistration Request usually      |
+  #   |                                      |       |           | holds the 5G-GUTI.                  |
   #
   # When the UE sends randomValue instead of ng-5G-S-TMSI-Part1 in RRCSetupRequest, the gNB
   # has no 5G-S-TMSI to copy, so the NGAP IE "5G-S-TMSI" is missing. The NAS IE "5GS mobile
   # identity" is still present in that case. The MTK UE always sends randomValue
   # (CU log: nr-rrc.ue_Identity == 1).
   #
-  # This flag is a fallback only. When the NGAP IE "5G-S-TMSI" is present, the AMF always uses
-  # it, whatever the value of this flag.
+  # Example: free5gc restarts but the UE does not. The UE still holds its old 5G-GUTI, so it
+  # sends a Registration Request of type "mobility registration updating". Without
+  # "mobilityRegistrationUpdating" in this list, the AMF releases the UE every time it retries,
+  # about every 10 s.
   #
-  #   | Value           | AMF behaviour for a Service Request without NGAP IE "5G-S-TMSI"   |
-  #   |-----------------|-------------------------------------------------------------------|
-  #   | false (default) | Stock: send ErrorIndication, then UEContextReleaseCommand with    |
-  #   |                 | cause Protocol=unspecified. The UE retries and is released again. |
-  #   | true            | Read the 5G-S-TMSI from NAS IE "5GS mobile identity", and use it  |
-  #   |                 | to find the stored UE context.                                    |
-  useNasIdentityIfNgapSTmsiMissing: true
+  # Each entry names one NAS message. Allowed values:
+  #
+  #   | Value                        | NAS message                     | Log tag                      |
+  #   |------------------------------|---------------------------------|------------------------------|
+  #   | serviceRequest               | Service Request                 | STMSI-FALLBACK/SERVICE-REQ   |
+  #   | mobilityRegistrationUpdating | Registration Request, type 0x02 | STMSI-FALLBACK/MOBILITY-REG  |
+  #   | periodicRegistrationUpdating | Registration Request, type 0x03 | STMSI-FALLBACK/PERIODIC-REG  |
+  #   | emergencyRegistration        | Registration Request, type 0x04 | STMSI-FALLBACK/EMERGENCY-REG |
+  #   | deregistrationRequest        | Deregistration Request (UE      | STMSI-FALLBACK/DEREG-REQ     |
+  #   |                              | originating)                    |                              |
+  #
+  # A UE in idle mode sends its Deregistration Request inside an InitialUEMessage, for example
+  # when airplane mode is turned on. Without "deregistrationRequest" in this list, the AMF drops it
+  # and keeps the UE context as registered (seen in a live test). The Deregistration
+  # Request holds a 5G-GUTI, so the AMF uses the stored context only when
+  # trustGutiInNasIdentityFallback below is true. requireMacForNasIdentityFallbackDeregistration
+  # below decides what happens when the message fails the NAS integrity check.
+  #
+  # Initial Registration (type 0x01) is not in the table. Stock free5gc already reads its
+  # identity from NAS. Any other value stops the AMF at startup with
+  # "invalid NasIdentityFallbackIfNgapSTmsiMissing".
+  #
+  # The list is a fallback only. When the NGAP IE "5G-S-TMSI" is present, the AMF always uses
+  # it, whatever the list holds.
+  #
+  #   | NAS message without NGAP IE "5G-S-TMSI" | AMF behaviour                                  |
+  #   |-----------------------------------------|------------------------------------------------|
+  #   | Listed                                  | Read the identity from NAS IE "5GS mobile      |
+  #   |                                         | identity", and use it to find the UE context.  |
+  #   | Not listed, or list empty or absent     | Stock: send ErrorIndication, then              |
+  #   |                                         | UEContextReleaseCommand with cause             |
+  #   |                                         | Protocol=unspecified. The UE retries and is    |
+  #   |                                         | released again.                                |
+  #   | Any other NAS message                   | Stock, as above. Logged as                     |
+  #   |                                         | STMSI-FALLBACK/UNSUPPORTED.                    |
+  #
+  # To turn the fallback off for one message, delete the line of that message, or comment
+  # that line out with "#".
+  # To turn it off for every message, delete the whole key or set it to [].
+  #
+  # Each case writes one AMF log line. Find them all with: grep '#WNC STMSI-FALLBACK'
+  #   Listed:     #WNC STMSI-FALLBACK/MOBILITY-REG ... is in nasIdentityFallbackIfNgapSTmsiMissing,
+  #               so using NAS IE "5GS mobile identity"
+  #   Not listed: #WNC STMSI-FALLBACK/MOBILITY-REG ... is not in
+  #               nasIdentityFallbackIfNgapSTmsiMissing, so sending ErrorIndication and
+  #               UEContextReleaseCommand
+  #   No fallback: #WNC STMSI-FALLBACK/UNSUPPORTED NAS message type ...
+  nasIdentityFallbackIfNgapSTmsiMissing:
+    - serviceRequest
+    - mobilityRegistrationUpdating
+    - deregistrationRequest
+    # - periodicRegistrationUpdating
+    # - emergencyRegistration
+  # #WNC STMSI-FALLBACK/TRUST-GUTI
+  # trustGutiInNasIdentityFallback selects whether the AMF uses a stored UE context that matches a
+  # 5G-GUTI read by the NAS identity fallback above. It applies only when the fallback ran, and
+  # only to a 5G-GUTI. A Service Request gives a 5G-S-TMSI, so this switch does not change it.
+  #
+  # A Registration Request of type mobility or periodic registration updating holds the UE's
+  # 5G-GUTI. Stock free5gc never uses a stored context for a 5G-GUTI found in an InitialUEMessage
+  # (ngap/handler.go, isInvalidGUTI). For a mobility or periodic registration updating, the AMF
+  # then sends Registration Reject with 5GMM cause #10 "implicitly de-registered" and releases the
+  # UE. The UE then drops its PDU sessions and starts a new Initial Registration. The MTK UE never
+  # gives the gNB a 5G-S-TMSI, so every mobility and periodic registration from it takes this path,
+  # even while the AMF still holds its context.
+  #
+  # The AMF matches the full 5G-GUTI (PLMN + AMF ID + 5G-TMSI) against its stored UE contexts. Only
+  # a GUTI that this AMF issued can match, with any GUAMI in servedGuamiList.
+  #
+  #   | Situation                              | false (default, stock)    | true                          |
+  #   |----------------------------------------|---------------------------|-------------------------------|
+  #   | 1. free5gc restarted, the AMF has no   | Registration Reject #10,  | Same: Registration Reject     |
+  #   |    context for the GUTI                | then release. The UE does | #10, then release. Nothing    |
+  #   |                                        | a new Initial             | matches.                      |
+  #   |                                        | Registration              |                               |
+  #   | 2. The AMF has the context; the UE     | Registration Reject #10.  | The AMF uses the stored       |
+  #   |    sends a mobility registration       | The UE drops its PDU      | context: Registration Accept, |
+  #   |    updating (e.g. new tracking area)   | sessions and registers    | and the UE keeps its PDU      |
+  #   |                                        | again                     | sessions                      |
+  #   | 3. The AMF has the context; the UE     | Registration Reject #10   | Same as situation 2. Needs    |
+  #   |    sends a periodic registration       | (when listed above)       | periodicRegistrationUpdating  |
+  #   |    updating (T3512 ran out)            |                           | in the list above             |
+  #   | 4. The AMF has the context; the UE     | Release only. The AMF     | The AMF deregisters the UE:   |
+  #   |    sends a Deregistration Request      | keeps the context as      | Deregistration Accept unless  |
+  #   |    from idle (airplane mode on)        | registered                | switch-off is set, then       |
+  #   |                                        |                           | release. Needs                |
+  #   |                                        |                           | deregistrationRequest in the  |
+  #   |                                        |                           | list above                    |
+  #
+  # In situation 1, a Deregistration Request gets no NAS answer, only a release with cause
+  # NAS normal-release. There is no context left to deregister.
+  #
+  # Security for a Registration Request: trust only selects which stored context the AMF uses. The
+  # AMF still verifies the NAS MAC with that context's keys. A plain or wrongly protected message
+  # sets MacFailed, so the AMF runs the security procedures again before it accepts the UE.
+  # Security for a Deregistration Request: stock free5gc does not check its MAC (nas_security.Decode
+  # accepts a failed MAC, and gmm.HandleDeregistrationRequest never reads MacFailed). See
+  # requireMacForNasIdentityFallbackDeregistration below.
+  #
+  # Each decision writes one AMF log line. Find them with: grep '#WNC STMSI-FALLBACK/TRUST-GUTI'
+  #   | Log tag                             | Meaning                                               |
+  #   |-------------------------------------|-------------------------------------------------------|
+  #   | STMSI-FALLBACK/TRUST-GUTI-OFF       | Switch is false; the stock code treats the 5G-GUTI as |
+  #   |                                     | unverified                                            |
+  #   | STMSI-FALLBACK/TRUST-GUTI-FOUND     | Switch is true and a stored context matches (2 or 3)  |
+  #   | STMSI-FALLBACK/TRUST-GUTI-NOT-FOUND | Switch is true and no context matches (1)             |
+  trustGutiInNasIdentityFallback: true
+  # #WNC STMSI-FALLBACK/DEREG-MAC
+  # requireMacForNasIdentityFallbackDeregistration selects whether a Deregistration Request must
+  # pass the NAS integrity check before the AMF deregisters the UE. It applies only when the AMF
+  # found the UE through "deregistrationRequest" in nasIdentityFallbackIfNgapSTmsiMissing and
+  # trustGutiInNasIdentityFallback. When the gNB sends NGAP IE "5G-S-TMSI", the AMF uses stock
+  # handling whatever this switch says.
+  #
+  # Stock free5gc deregisters the UE even when the MAC of the Deregistration Request is wrong.
+  # A UE in idle mode normally sends its Deregistration Request integrity protected (NAS security
+  # header type 0x01), so true should not block a real UE.
+  #
+  #   | Deregistration Request   | false (default, stock)        | true                           |
+  #   |--------------------------|-------------------------------|--------------------------------|
+  #   | Passes the NAS integrity | The AMF deregisters the UE    | Same: the AMF deregisters the  |
+  #   | check                    |                               | UE                             |
+  #   | Fails the check, or is   | The AMF deregisters the UE    | The AMF sends only             |
+  #   | sent as plain NAS        | anyway                        | UEContextReleaseCommand and    |
+  #   |                          |                               | keeps the UE context as        |
+  #   |                          |                               | registered                     |
+  #
+  # If true blocks the UE (DEREG-MAC-FAILED appears each time the UE turns on airplane mode), set
+  # this to false. The UE then gets stock handling.
+  #
+  # Each decision writes one AMF log line. Find them with: grep '#WNC STMSI-FALLBACK/DEREG-MAC'
+  #   | Log tag                               | Meaning                                             |
+  #   |---------------------------------------|-----------------------------------------------------|
+  #   | STMSI-FALLBACK/DEREG-MAC-OK           | The message passed the check; the AMF handles it    |
+  #   | STMSI-FALLBACK/DEREG-MAC-NOT-REQUIRED | The check failed; switch is false, so the AMF       |
+  #   |                                       | handles it anyway                                   |
+  #   | STMSI-FALLBACK/DEREG-MAC-FAILED       | The check failed; switch is true, so the AMF only   |
+  #   |                                       | releases                                            |
+  requireMacForNasIdentityFallbackDeregistration: true
   # WNC: preferSubscribedDefaultInAllowedNssai selects how the AMF picks the S-NSSAI for a PDU
   # Session Establishment Request that carries no S-NSSAI IE. The AMF always picks from the
   # Allowed NSSAI. Three different slice lists are involved:
