@@ -280,8 +280,13 @@ configuration:
   #
   # When the UE sends randomValue instead of ng-5G-S-TMSI-Part1 in RRCSetupRequest, the gNB
   # has no 5G-S-TMSI to copy, so the NGAP IE "5G-S-TMSI" is missing. The NAS IE "5GS mobile
-  # identity" is still present in that case. The MTK UE always sends randomValue
-  # (CU log: nr-rrc.ue_Identity == 1).
+  # identity" is still present in that case.
+  #
+  # The MTK test UE sent randomValue (CU log: nr-rrc.ue_Identity == 1) while its 5G-GUTI held
+  # PLMN 466-11 on the 310-260 cell. The AMF now gives a 310-260 SIM a 310-260 5G-GUTI
+  # (#WNC GUTI-PLMN/REALLOCATE), and since then the InitialUEMessages from that UE carry the NGAP
+  # IE "5G-S-TMSI". This list is therefore a safety net, for a UE that still holds an old 466-11
+  # 5G-GUTI, and for a UE that sends randomValue for another reason.
   #
   # Example: free5gc restarts but the UE does not. The UE still holds its old 5G-GUTI, so it
   # sends a Registration Request of type "mobility registration updating". Without
@@ -339,7 +344,7 @@ configuration:
     - serviceRequest
     - mobilityRegistrationUpdating
     - deregistrationRequest
-    # - periodicRegistrationUpdating
+    - periodicRegistrationUpdating
     # - emergencyRegistration
   # #WNC STMSI-FALLBACK/TRUST-GUTI
   # trustGutiInNasIdentityFallback selects whether the AMF uses a stored UE context that matches a
@@ -350,9 +355,11 @@ configuration:
   # 5G-GUTI. Stock free5gc never uses a stored context for a 5G-GUTI found in an InitialUEMessage
   # (ngap/handler.go, isInvalidGUTI). For a mobility or periodic registration updating, the AMF
   # then sends Registration Reject with 5GMM cause #10 "implicitly de-registered" and releases the
-  # UE. The UE then drops its PDU sessions and starts a new Initial Registration. The MTK UE never
-  # gives the gNB a 5G-S-TMSI, so every mobility and periodic registration from it takes this path,
-  # even while the AMF still holds its context.
+  # UE. The UE then drops its PDU sessions and starts a new Initial Registration. While the MTK
+  # test UE held a 466-11 5G-GUTI, it never gave the gNB a 5G-S-TMSI, so every mobility and
+  # periodic registration from it took this path, even while the AMF still held its context. With
+  # a 310-260 5G-GUTI, the NGAP IE "5G-S-TMSI" is present, so the AMF finds the context by that IE
+  # and this switch is not used.
   #
   # The AMF matches the full 5G-GUTI (PLMN + AMF ID + 5G-TMSI) against its stored UE contexts. Only
   # a GUTI that this AMF issued can match, with any GUAMI in servedGuamiList.
